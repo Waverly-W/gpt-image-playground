@@ -22,7 +22,7 @@ type HistoryImage = {
 export type HistoryMetadata = {
     timestamp: number;
     images: HistoryImage[];
-    storageModeUsed?: 'fs' | 'indexeddb';
+    storageModeUsed?: 'fs' | 'indexeddb' | 'r2';
     durationMs: number;
     quality: GenerationFormData['quality'];
     background: GenerationFormData['background'];
@@ -43,25 +43,7 @@ type DrawnPoint = {
 
 const MAX_EDIT_IMAGES = 10;
 
-const explicitModeClient = process.env.NEXT_PUBLIC_IMAGE_STORAGE_MODE;
-
-const vercelEnvClient = process.env.NEXT_PUBLIC_VERCEL_ENV;
-const isOnVercelClient = vercelEnvClient === 'production' || vercelEnvClient === 'preview';
-
-let effectiveStorageModeClient: 'fs' | 'indexeddb';
-
-if (explicitModeClient === 'fs') {
-    effectiveStorageModeClient = 'fs';
-} else if (explicitModeClient === 'indexeddb') {
-    effectiveStorageModeClient = 'indexeddb';
-} else if (isOnVercelClient) {
-    effectiveStorageModeClient = 'indexeddb';
-} else {
-    effectiveStorageModeClient = 'fs';
-}
-console.log(
-    `Client Effective Storage Mode: ${effectiveStorageModeClient} (Explicit: ${explicitModeClient || 'unset'}, Vercel Env: ${vercelEnvClient || 'N/A'})`
-);
+let effectiveStorageModeClient: 'fs' | 'indexeddb' | 'r2' = 'fs';
 
 type ApiImageResponseItem = {
     filename: string;
@@ -70,12 +52,20 @@ type ApiImageResponseItem = {
     path?: string;
 };
 
+type ApiStorageMode = 'fs' | 'indexeddb' | 'r2';
+
+type DisplayImage = {
+    path: string;
+    filename: string;
+    storageMode?: ApiStorageMode;
+};
+
 export default function ImagePlaygroundClient({ initialUser }: { initialUser: SessionUser }) {
     const [mode, setMode] = React.useState<'generate' | 'edit'>('generate');
     const [isLoading, setIsLoading] = React.useState(false);
     const [isSendingToEdit, setIsSendingToEdit] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
-    const [latestImageBatch, setLatestImageBatch] = React.useState<{ path: string; filename: string }[] | null>(null);
+    const [latestImageBatch, setLatestImageBatch] = React.useState<DisplayImage[] | null>(null);
     const [imageOutputView, setImageOutputView] = React.useState<'grid' | number>('grid');
     const [history, setHistory] = React.useState<HistoryMetadata[]>([]);
     const [isInitialLoad, setIsInitialLoad] = React.useState(true);
@@ -360,6 +350,11 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                                     durationMs = Date.now() - startTime;
 
                                     if (event.images && event.images.length > 0) {
+                                        const responseStorageMode: ApiStorageMode =
+                                            event.storageMode === 'indexeddb' || event.storageMode === 'r2'
+                                                ? event.storageMode
+                                                : 'fs';
+                                        effectiveStorageModeClient = responseStorageMode;
                                         let historyQuality: GenerationFormData['quality'] = 'auto';
                                         let historyBackground: GenerationFormData['background'] = 'auto';
                                         let historyModeration: GenerationFormData['moderation'] = 'auto';
@@ -389,7 +384,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                                             images: event.images.map((img: { filename: string }) => ({
                                                 filename: img.filename
                                             })),
-                                            storageModeUsed: effectiveStorageModeClient,
+                                            storageModeUsed: responseStorageMode,
                                             durationMs: durationMs,
                                             quality: historyQuality,
                                             background: historyBackground,
@@ -402,11 +397,8 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                                             ownerUserId: initialUser.id
                                         };
 
-                                        let newImageBatchPromises: Promise<{
-                                            path: string;
-                                            filename: string;
-                                        } | null>[] = [];
-                                        if (effectiveStorageModeClient === 'indexeddb') {
+                                        let newImageBatchPromises: Promise<DisplayImage | null>[] = [];
+                                        if (responseStorageMode === 'indexeddb') {
                                             newImageBatchPromises = event.images.map(
                                                 async (img: ApiImageResponseItem) => {
                                                     if (img.b64_json) {
@@ -430,7 +422,11 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                                                             const blobUrl = URL.createObjectURL(blob);
                                                             blobUrlCacheRef.current.set(img.filename, blobUrl);
 
-                                                            return { filename: img.filename, path: blobUrl };
+                                                            return {
+                                                                filename: img.filename,
+                                                                path: blobUrl,
+                                                                storageMode: responseStorageMode
+                                                            };
                                                         } catch (dbError) {
                                                             console.error(
                                                                 `Error saving blob ${img.filename} to IndexedDB:`,
@@ -455,17 +451,15 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                                                 .map((img: ApiImageResponseItem) =>
                                                     Promise.resolve({
                                                         path: img.path!,
-                                                        filename: img.filename
+                                                        filename: img.filename,
+                                                        storageMode: responseStorageMode
                                                     })
                                                 );
                                         }
 
                                         const processedImages = (await Promise.all(newImageBatchPromises)).filter(
                                             Boolean
-                                        ) as {
-                                            path: string;
-                                            filename: string;
-                                        }[];
+                                        ) as DisplayImage[];
 
                                         setLatestImageBatch(processedImages);
                                         setImageOutputView(processedImages.length > 1 ? 'grid' : 0);
@@ -493,6 +487,9 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
 
             if (result.images && result.images.length > 0) {
                 durationMs = Date.now() - startTime;
+                const responseStorageMode: ApiStorageMode =
+                    result.storageMode === 'indexeddb' || result.storageMode === 'r2' ? result.storageMode : 'fs';
+                effectiveStorageModeClient = responseStorageMode;
 
                 let historyQuality: GenerationFormData['quality'] = 'auto';
                 let historyBackground: GenerationFormData['background'] = 'auto';
@@ -521,7 +518,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                 const newHistoryEntry: HistoryMetadata = {
                     timestamp: batchTimestamp,
                     images: result.images.map((img: { filename: string }) => ({ filename: img.filename })),
-                    storageModeUsed: effectiveStorageModeClient,
+                    storageModeUsed: responseStorageMode,
                     durationMs: durationMs,
                     quality: historyQuality,
                     background: historyBackground,
@@ -534,8 +531,8 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                     ownerUserId: initialUser.id
                 };
 
-                let newImageBatchPromises: Promise<{ path: string; filename: string } | null>[] = [];
-                if (effectiveStorageModeClient === 'indexeddb') {
+                let newImageBatchPromises: Promise<DisplayImage | null>[] = [];
+                if (responseStorageMode === 'indexeddb') {
                     newImageBatchPromises = result.images.map(async (img: ApiImageResponseItem) => {
                         if (img.b64_json) {
                             try {
@@ -554,7 +551,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                                 const blobUrl = URL.createObjectURL(blob);
                                 blobUrlCacheRef.current.set(img.filename, blobUrl);
 
-                                return { filename: img.filename, path: blobUrl };
+                                return { filename: img.filename, path: blobUrl, storageMode: responseStorageMode };
                             } catch (dbError) {
                                 console.error(`Error saving blob ${img.filename} to IndexedDB:`, dbError);
                                 setError(`Failed to save image ${img.filename} to local database.`);
@@ -571,15 +568,13 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                         .map((img: ApiImageResponseItem) =>
                             Promise.resolve({
                                 path: img.path!,
-                                filename: img.filename
+                                filename: img.filename,
+                                storageMode: responseStorageMode
                             })
                         );
                 }
 
-                const processedImages = (await Promise.all(newImageBatchPromises)).filter(Boolean) as {
-                    path: string;
-                    filename: string;
-                }[];
+                const processedImages = (await Promise.all(newImageBatchPromises)).filter(Boolean) as DisplayImage[];
 
                 setLatestImageBatch(processedImages);
                 setImageOutputView(processedImages.length > 1 ? 'grid' : 0);
@@ -615,7 +610,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                 }
 
                 if (path) {
-                    return { path, filename: imgInfo.filename };
+                    return { path, filename: imgInfo.filename, storageMode: originalStorageMode };
                 } else {
                     console.warn(
                         `Could not get image source for history item: ${imgInfo.filename} (mode: ${originalStorageMode})`
@@ -626,7 +621,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
             });
 
             Promise.all(selectedBatchPromises).then((resolvedBatch) => {
-                const validImages = resolvedBatch.filter(Boolean) as { path: string; filename: string }[];
+                const validImages = resolvedBatch.filter(Boolean) as DisplayImage[];
 
                 if (validImages.length !== item.images.length) {
                     setError(
@@ -691,7 +686,11 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
             let blob: Blob | undefined;
             let mimeType: string = 'image/png';
 
-            if (effectiveStorageModeClient === 'indexeddb') {
+            const sourceStorageMode =
+                latestImageBatch?.find((image) => image.filename === filename)?.storageMode ??
+                effectiveStorageModeClient;
+
+            if (sourceStorageMode === 'indexeddb') {
                 const record = allDbImages?.find((img) => img.filename === filename);
                 if (record?.blob) {
                     blob = record.blob;
@@ -747,7 +746,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                     if (url) URL.revokeObjectURL(url);
                     blobUrlCacheRef.current.delete(fn);
                 });
-            } else if (storageModeUsed === 'fs') {
+            } else if (storageModeUsed === 'fs' || storageModeUsed === 'r2') {
                 const apiPayload: { filenames: string[] } = {
                     filenames: filenamesToDelete
                 };

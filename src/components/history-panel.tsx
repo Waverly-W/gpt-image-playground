@@ -1,7 +1,6 @@
 'use client';
 
 import type { HistoryMetadata } from '@/app/page';
-import { getModelRates, type GptImageModel } from '@/lib/cost-utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -15,6 +14,7 @@ import {
     DialogFooter,
     DialogClose
 } from '@/components/ui/dialog';
+import { getModelRates, type GptImageModel } from '@/lib/cost-utils';
 import { cn } from '@/lib/utils';
 import {
     Copy,
@@ -25,6 +25,7 @@ import {
     Sparkles as SparklesIcon,
     HardDrive,
     Database,
+    Cloud,
     FileImage,
     Trash2
 } from 'lucide-react';
@@ -252,10 +253,18 @@ function HistoryPanelImpl({
                                                 <div className='flex items-center gap-1 rounded-full border border-white/10 bg-neutral-900/80 px-1 py-0.5 text-[11px] text-white/70'>
                                                     {originalStorageMode === 'fs' ? (
                                                         <HardDrive size={12} className='text-neutral-400' />
+                                                    ) : originalStorageMode === 'r2' ? (
+                                                        <Cloud size={12} className='text-orange-300' />
                                                     ) : (
                                                         <Database size={12} className='text-blue-400' />
                                                     )}
-                                                    <span>{originalStorageMode === 'fs' ? 'file' : 'db'}</span>
+                                                    <span>
+                                                        {originalStorageMode === 'fs'
+                                                            ? 'file'
+                                                            : originalStorageMode === 'r2'
+                                                              ? 'r2'
+                                                              : 'db'}
+                                                    </span>
                                                 </div>
                                                 {item.output_format && (
                                                     <div className='flex items-center gap-1 rounded-full border border-white/10 bg-neutral-900/80 px-1 py-0.5 text-[11px] text-white/70'>
@@ -306,8 +315,8 @@ function HistoryPanelImpl({
                                                                             1M tokens
                                                                         </li>
                                                                         <li>
-                                                                            Image Output: $
-                                                                            {rates.imageOutputPerMillion} / 1M tokens
+                                                                            Image Output: ${rates.imageOutputPerMillion}{' '}
+                                                                            / 1M tokens
                                                                         </li>
                                                                     </ul>
                                                                 </div>
@@ -331,8 +340,7 @@ function HistoryPanelImpl({
                                                                                 {item.costDetails.image_input_tokens.toLocaleString()}{' '}
                                                                                 (~$
                                                                                 {calculateCost(
-                                                                                    item.costDetails
-                                                                                        .image_input_tokens,
+                                                                                    item.costDetails.image_input_tokens,
                                                                                     rates.imageInputPerToken
                                                                                 )}
                                                                                 )
@@ -355,7 +363,10 @@ function HistoryPanelImpl({
                                                                     <div className='flex justify-between font-medium text-white'>
                                                                         <span>Total Estimated Cost:</span>
                                                                         <span>
-                                                                            ${item.costDetails.estimated_cost_usd.toFixed(4)}
+                                                                            $
+                                                                            {item.costDetails.estimated_cost_usd.toFixed(
+                                                                                4
+                                                                            )}
                                                                         </span>
                                                                     </div>
                                                                 </div>
@@ -384,7 +395,8 @@ function HistoryPanelImpl({
                                             {formatDuration(item.durationMs)}
                                         </p>
                                         <p>
-                                            <span className='font-medium text-white/80'>Model:</span> {item.model || 'gpt-image-1'}
+                                            <span className='font-medium text-white/80'>Model:</span>{' '}
+                                            {item.model || 'gpt-image-1'}
                                         </p>
                                         <p>
                                             <span className='font-medium text-white/80'>Quality:</span> {item.quality}

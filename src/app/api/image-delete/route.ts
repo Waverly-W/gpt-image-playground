@@ -1,4 +1,5 @@
 import { canAccessImage, deleteImageOwnership } from '@/lib/image-ownership';
+import { deleteR2Image, resolveImageStorageMode } from '@/lib/image-storage';
 import { authErrorResponse, requireSession } from '@/lib/server-auth';
 import fs from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const deletionResults: FileDeletionResult[] = [];
+    const storageMode = resolveImageStorageMode();
 
     for (const filename of filenames) {
         if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
@@ -61,9 +63,13 @@ export async function POST(request: NextRequest) {
         }
 
         try {
-            await fs.unlink(filepath);
+            if (storageMode === 'r2') {
+                await deleteR2Image(filename);
+            } else {
+                await fs.unlink(filepath);
+            }
             deleteImageOwnership(filename);
-            console.log(`Successfully deleted image: ${filepath}`);
+            console.log(`Successfully deleted image: ${storageMode === 'r2' ? filename : filepath}`);
             deletionResults.push({ filename, success: true });
         } catch (error: unknown) {
             console.error(`Error deleting image ${filepath}:`, error);

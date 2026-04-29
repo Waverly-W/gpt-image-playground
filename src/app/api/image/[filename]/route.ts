@@ -1,12 +1,24 @@
+import { canAccessImage } from '@/lib/image-ownership';
+import { getR2Image, resolveImageStorageMode } from '@/lib/image-storage';
+import { authErrorResponse, requireSession } from '@/lib/server-auth';
 import fs from 'fs/promises';
 import { lookup } from 'mime-types';
 import { NextRequest, NextResponse } from 'next/server';
-import { canAccessImage } from '@/lib/image-ownership';
-import { authErrorResponse, requireSession } from '@/lib/server-auth';
 import path from 'path';
 
 // Base directory where images are stored (outside nextjs-app)
 const imageBaseDir = path.resolve(process.cwd(), 'generated-images');
+
+function isMissingImageError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) {
+        return false;
+    }
+
+    return (
+        ('code' in error && error.code === 'ENOENT') ||
+        ('name' in error && (error.name === 'NoSuchKey' || error.name === 'NotFound'))
+    );
+}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ filename: string }> }) {
     let session;
@@ -31,25 +43,28 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const storageMode = resolveImageStorageMode();
     const filepath = path.join(imageBaseDir, filename);
 
     try {
-        await fs.access(filepath);
+        const image =
+            storageMode === 'r2'
+                ? await getR2Image(filename)
+                : {
+                      buffer: await fs.readFile(filepath),
+                      contentType: lookup(filename) || 'application/octet-stream'
+                  };
 
-        const fileBuffer = await fs.readFile(filepath);
-
-        const contentType = lookup(filename) || 'application/octet-stream';
-
-        return new NextResponse(fileBuffer, {
+        return new NextResponse(image.buffer, {
             status: 200,
             headers: {
-                'Content-Type': contentType,
-                'Content-Length': fileBuffer.length.toString()
+                'Content-Type': image.contentType,
+                'Content-Length': image.buffer.length.toString()
             }
         });
     } catch (error: unknown) {
         console.error(`Error serving image ${filename}:`, error);
-        if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') {
+        if (isMissingImageError(error)) {
             return NextResponse.json({ error: 'Image not found' }, { status: 404 });
         }
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

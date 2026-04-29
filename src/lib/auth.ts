@@ -1,3 +1,4 @@
+import { getRuntimeConfig } from './settings';
 import { getUserByEmail, type UserWithPasswordHash, verifyPassword } from './users';
 import { SignJWT, jwtVerify } from 'jose';
 
@@ -76,8 +77,9 @@ export async function verifySessionToken(token: string | undefined | null): Prom
 }
 
 export function shouldUseSecureAuthCookie(request?: Request): boolean {
-    if (process.env.AUTH_COOKIE_SECURE === 'true') return true;
-    if (process.env.AUTH_COOKIE_SECURE === 'false') return false;
+    const configuredValue = getRuntimeConfig().authCookieSecure;
+    if (configuredValue === 'true') return true;
+    if (configuredValue === 'false') return false;
     if (process.env.NODE_ENV !== 'production') return false;
 
     const forwardedProto = request?.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase();

@@ -1,9 +1,11 @@
+import { recordImageOwner } from '@/lib/image-ownership';
+import { putR2Image, resolveImageStorageMode, type ImageStorageMode } from '@/lib/image-storage';
+import { createOpenAIClient, getOpenAIConfig } from '@/lib/openai-config';
+import { authErrorResponse, requireSession } from '@/lib/server-auth';
 import fs from 'fs/promises';
+import { lookup } from 'mime-types';
 import { NextRequest, NextResponse } from 'next/server';
 import type OpenAI from 'openai';
-import { createOpenAIClient } from '@/lib/openai-config';
-import { recordImageOwner } from '@/lib/image-ownership';
-import { authErrorResponse, requireSession } from '@/lib/server-auth';
 import path from 'path';
 
 // Streaming event types
@@ -16,6 +18,7 @@ type StreamingEvent = {
     path?: string;
     output_format?: string;
     usage?: OpenAI.Images.ImagesResponse['usage'];
+    storageMode?: ImageStorageMode;
     images?: Array<{
         filename: string;
         b64_json: string;
@@ -24,8 +27,6 @@ type StreamingEvent = {
     }>;
     error?: string;
 };
-
-const openai = createOpenAIClient();
 
 const outputDir = path.resolve(process.cwd(), 'generated-images');
 
@@ -78,26 +79,17 @@ export async function POST(request: NextRequest) {
         return authErrorResponse(error) ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    const openaiConfig = getOpenAIConfig();
+    if (!openaiConfig.apiKey) {
         console.error('OPENAI_API_KEY is not set.');
         return NextResponse.json({ error: 'Server configuration error: API key not found.' }, { status: 500 });
     }
+    const openai = createOpenAIClient();
     try {
-        let effectiveStorageMode: 'fs' | 'indexeddb';
-        const explicitMode = process.env.NEXT_PUBLIC_IMAGE_STORAGE_MODE;
+        const effectiveStorageMode: ImageStorageMode = resolveImageStorageMode();
         const isOnVercel = process.env.VERCEL === '1';
-
-        if (explicitMode === 'fs') {
-            effectiveStorageMode = 'fs';
-        } else if (explicitMode === 'indexeddb') {
-            effectiveStorageMode = 'indexeddb';
-        } else if (isOnVercel) {
-            effectiveStorageMode = 'indexeddb';
-        } else {
-            effectiveStorageMode = 'fs';
-        }
         console.log(
-            `Effective Image Storage Mode: ${effectiveStorageMode} (Explicit: ${explicitMode || 'unset'}, Vercel: ${isOnVercel})`
+            `Effective Image Storage Mode: ${effectiveStorageMode} (Configured via database or env fallback, Vercel: ${isOnVercel})`
         );
 
         if (effectiveStorageMode === 'fs') {
@@ -109,12 +101,8 @@ export async function POST(request: NextRequest) {
         const mode = formData.get('mode') as 'generate' | 'edit' | null;
         const prompt = formData.get('prompt') as string | null;
         const model =
-            (formData.get('model') as
-                | 'gpt-image-1'
-                | 'gpt-image-1-mini'
-                | 'gpt-image-1.5'
-                | 'gpt-image-2'
-                | null) || 'gpt-image-2';
+            (formData.get('model') as 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5' | 'gpt-image-2' | null) ||
+            'gpt-image-2';
 
         console.log(`Mode: ${mode}, Model: ${model}, Prompt: ${prompt ? prompt.substring(0, 50) + '...' : 'N/A'}`);
 
@@ -201,11 +189,14 @@ export async function POST(request: NextRequest) {
                                     const currentIndex = imageIndex;
                                     const filename = `${timestamp}-${currentIndex}.${fileExtension}`;
 
-                                    // Save to filesystem if in fs mode
-                                    if (effectiveStorageMode === 'fs' && event.b64_json) {
+                                    if (effectiveStorageMode !== 'indexeddb' && event.b64_json) {
                                         const buffer = Buffer.from(event.b64_json, 'base64');
-                                        const filepath = path.join(outputDir, filename);
-                                        await fs.writeFile(filepath, buffer);
+                                        if (effectiveStorageMode === 'fs') {
+                                            const filepath = path.join(outputDir, filename);
+                                            await fs.writeFile(filepath, buffer);
+                                        } else {
+                                            await putR2Image(filename, buffer, lookup(filename) || undefined);
+                                        }
                                         recordImageOwner(filename, session.id);
                                         console.log(`Streaming: Saved image ${filename}`);
                                     }
@@ -214,7 +205,9 @@ export async function POST(request: NextRequest) {
                                         filename,
                                         b64_json: event.b64_json || '',
                                         output_format: fileExtension,
-                                        ...(effectiveStorageMode === 'fs' ? { path: `/api/image/${filename}` } : {})
+                                        ...(effectiveStorageMode !== 'indexeddb'
+                                            ? { path: `/api/image/${filename}` }
+                                            : {})
                                     };
                                     completedImages.push(imageData);
 
@@ -223,7 +216,8 @@ export async function POST(request: NextRequest) {
                                         index: currentIndex,
                                         filename,
                                         b64_json: event.b64_json,
-                                        path: effectiveStorageMode === 'fs' ? `/api/image/${filename}` : undefined,
+                                        path:
+                                            effectiveStorageMode !== 'indexeddb' ? `/api/image/${filename}` : undefined,
                                         output_format: fileExtension
                                     };
                                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(completedEvent)}\n\n`));
@@ -241,7 +235,8 @@ export async function POST(request: NextRequest) {
                             const doneEvent: StreamingEvent = {
                                 type: 'done',
                                 images: completedImages,
-                                usage: finalUsage
+                                usage: finalUsage,
+                                storageMode: effectiveStorageMode
                             };
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify(doneEvent)}\n\n`));
                             controller.close();
@@ -261,7 +256,7 @@ export async function POST(request: NextRequest) {
                     headers: {
                         'Content-Type': 'text/event-stream',
                         'Cache-Control': 'no-cache',
-                        'Connection': 'keep-alive'
+                        Connection: 'keep-alive'
                     }
                 });
             }
@@ -346,11 +341,14 @@ export async function POST(request: NextRequest) {
                                     const currentIndex = imageIndex;
                                     const filename = `${timestamp}-${currentIndex}.${fileExtension}`;
 
-                                    // Save to filesystem if in fs mode
-                                    if (effectiveStorageMode === 'fs' && event.b64_json) {
+                                    if (effectiveStorageMode !== 'indexeddb' && event.b64_json) {
                                         const buffer = Buffer.from(event.b64_json, 'base64');
-                                        const filepath = path.join(outputDir, filename);
-                                        await fs.writeFile(filepath, buffer);
+                                        if (effectiveStorageMode === 'fs') {
+                                            const filepath = path.join(outputDir, filename);
+                                            await fs.writeFile(filepath, buffer);
+                                        } else {
+                                            await putR2Image(filename, buffer, lookup(filename) || undefined);
+                                        }
                                         recordImageOwner(filename, session.id);
                                         console.log(`Streaming edit: Saved image ${filename}`);
                                     }
@@ -359,7 +357,9 @@ export async function POST(request: NextRequest) {
                                         filename,
                                         b64_json: event.b64_json || '',
                                         output_format: fileExtension,
-                                        ...(effectiveStorageMode === 'fs' ? { path: `/api/image/${filename}` } : {})
+                                        ...(effectiveStorageMode !== 'indexeddb'
+                                            ? { path: `/api/image/${filename}` }
+                                            : {})
                                     };
                                     completedImages.push(imageData);
 
@@ -368,7 +368,8 @@ export async function POST(request: NextRequest) {
                                         index: currentIndex,
                                         filename,
                                         b64_json: event.b64_json,
-                                        path: effectiveStorageMode === 'fs' ? `/api/image/${filename}` : undefined,
+                                        path:
+                                            effectiveStorageMode !== 'indexeddb' ? `/api/image/${filename}` : undefined,
                                         output_format: fileExtension
                                     };
                                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(completedEvent)}\n\n`));
@@ -386,7 +387,8 @@ export async function POST(request: NextRequest) {
                             const doneEvent: StreamingEvent = {
                                 type: 'done',
                                 images: completedImages,
-                                usage: finalUsage
+                                usage: finalUsage,
+                                storageMode: effectiveStorageMode
                             };
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify(doneEvent)}\n\n`));
                             controller.close();
@@ -406,7 +408,7 @@ export async function POST(request: NextRequest) {
                     headers: {
                         'Content-Type': 'text/event-stream',
                         'Cache-Control': 'no-cache',
-                        'Connection': 'keep-alive'
+                        Connection: 'keep-alive'
                     }
                 });
             }
@@ -445,13 +447,17 @@ export async function POST(request: NextRequest) {
                 const fileExtension = validateOutputFormat(formData.get('output_format'));
                 const filename = `${timestamp}-${index}.${fileExtension}`;
 
-                if (effectiveStorageMode === 'fs') {
-                    const filepath = path.join(outputDir, filename);
-                    console.log(`Attempting to save image to: ${filepath}`);
-                    await fs.writeFile(filepath, buffer);
+                if (effectiveStorageMode !== 'indexeddb') {
+                    if (effectiveStorageMode === 'fs') {
+                        const filepath = path.join(outputDir, filename);
+                        console.log(`Attempting to save image to: ${filepath}`);
+                        await fs.writeFile(filepath, buffer);
+                    } else {
+                        console.log(`Attempting to save image to R2: ${filename}`);
+                        await putR2Image(filename, buffer, lookup(filename) || undefined);
+                    }
                     recordImageOwner(filename, session.id);
                     console.log(`Successfully saved image: ${filename}`);
-                } else {
                 }
 
                 const imageResult: { filename: string; b64_json: string; path?: string; output_format: string } = {
@@ -460,7 +466,7 @@ export async function POST(request: NextRequest) {
                     output_format: fileExtension
                 };
 
-                if (effectiveStorageMode === 'fs') {
+                if (effectiveStorageMode !== 'indexeddb') {
                     imageResult.path = `/api/image/${filename}`;
                 }
 
@@ -470,7 +476,7 @@ export async function POST(request: NextRequest) {
 
         console.log(`All images processed. Mode: ${effectiveStorageMode}`);
 
-        return NextResponse.json({ images: savedImagesData, usage: result.usage });
+        return NextResponse.json({ images: savedImagesData, usage: result.usage, storageMode: effectiveStorageMode });
     } catch (error: unknown) {
         console.error('Error in /api/images:', error);
 

@@ -16,11 +16,11 @@ A web-based playground to interact with OpenAI's GPT image models (`gpt-image-2`
 - **📐 Custom Resolutions (gpt-image-2):** Pick from 2K/4K presets or enter an arbitrary Width × Height with live validation against the model's constraints (multiples of 16, max 3840px per edge, ≤ 3:1 aspect ratio, 655,360 to 8,294,400 total pixels).
 - **🎭 Integrated Masking Tool:** Easily create or upload masks directly within the editing mode to specify areas for modification. Draw directly on the image to generate a mask.
 
-         > ⚠️ Please note that `gpt-image-1`'s masking feature does not guarantee 100% control at this time. <br>1) [It's a known & acknowledged model limitation.](https://community.openai.com/t/gpt-image-1-problems-with-mask-edits/1240639/37) <br>2) [OpenAI are looking to address it in a future update.](https://community.openai.com/t/gpt-image-1-problems-with-mask-edits/1240639/41)
+           > ⚠️ Please note that `gpt-image-1`'s masking feature does not guarantee 100% control at this time. <br>1) [It's a known & acknowledged model limitation.](https://community.openai.com/t/gpt-image-1-problems-with-mask-edits/1240639/37) <br>2) [OpenAI are looking to address it in a future update.](https://community.openai.com/t/gpt-image-1-problems-with-mask-edits/1240639/41)
 
-    <p align="center">
-      <img src="./readme-images/mask-creation.jpg" alt="Interface" width="350"/>
-    </p>
+      <p align="center">
+        <img src="./readme-images/mask-creation.jpg" alt="Interface" width="350"/>
+      </p>
 
 - **📜 Detailed History & Cost Tracking:**
     - View a comprehensive history of all your image generations and edits.
@@ -41,9 +41,10 @@ A web-based playground to interact with OpenAI's GPT image models (`gpt-image-2`
 - **🖼️ Flexible Image Output View:** View generated image batches as a grid or select individual images for a closer look.
 - **🚀 Send to Edit:** Quickly send any generated or history image directly to the editing form.
 - **📋 Paste to Edit:** Paste images directly from your clipboard into the Edit mode's source image area.
-- **💾 Storage:** Supports two modes via `NEXT_PUBLIC_IMAGE_STORAGE_MODE`:
+- **💾 Storage:** Supports three modes from the admin configuration panel:
     - **Filesystem (default):** Images saved to `./generated-images` on the server.
     - **IndexedDB:** Images saved directly in the browser's IndexedDB (ideal for serverless deployments).
+    - **Cloudflare R2:** Images saved to a private R2 bucket and served through the app's authenticated `/api/image/:filename` route.
     - Generation history metadata is always saved in the browser's local storage.
 
 ## ▲ Deploy to Vercel
@@ -52,11 +53,9 @@ A web-based playground to interact with OpenAI's GPT image models (`gpt-image-2`
 
 You can deploy your own instance of this playground to Vercel with one click:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/alasano/gpt-image-1-playground&env=OPENAI_API_KEY,NEXT_PUBLIC_IMAGE_STORAGE_MODE,ADMIN_EMAIL,ADMIN_PASSWORD,JWT_SECRET&envDescription=OpenAI%20API%20Key%20is%20required.%20Set%20storage%20mode%20to%20indexeddb%20for%20Vercel%20deployments.&project-name=gpt-image-playground&repository-name=gpt-image-playground)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/alasano/gpt-image-1-playground&env=ADMIN_EMAIL,ADMIN_PASSWORD,JWT_SECRET&envDescription=Administrator%20credentials%20and%20JWT%20secret%20are%20required.%20OpenAI%20and%20storage%20settings%20are%20configured%20in%20the%20admin%20panel.&project-name=gpt-image-playground&repository-name=gpt-image-playground)
 
-You will be prompted to enter your `OPENAI_API_KEY` and admin account variables during the deployment setup. For Vercel deployments, it's required to set `NEXT_PUBLIC_IMAGE_STORAGE_MODE` to `indexeddb`.
-
-Note: If `NEXT_PUBLIC_IMAGE_STORAGE_MODE` is not set, the application will automatically detect if it's running on Vercel (using the `VERCEL` or `NEXT_PUBLIC_VERCEL_ENV` environment variables) and default to `indexeddb` mode in that case. Otherwise (e.g., running locally), it defaults to `fs` mode. You can always explicitly set the variable to `fs` or `indexeddb` to override this automatic behavior.
+You will be prompted to enter admin account variables during deployment. After logging in as the administrator, open `/admin` to configure the OpenAI API key, custom API base URL, image storage mode, R2 credentials, registration, and cookie behavior. These settings are persisted in SQLite.
 
 ## 🚀 Getting Started [Local Deployment]
 
@@ -67,57 +66,7 @@ Follow these steps to get the playground running locally.
 - [Node.js](https://nodejs.org/) (Version 20 or later required)
 - [npm](https://www.npmjs.com/), [yarn](https://yarnpkg.com/), [pnpm](https://pnpm.io/), or [bun](https://bun.sh/)
 
-### 1. Set Up API Key 🟢
-
-You need an OpenAI API key to use this application.
-
-⚠️ [Your OpenAI Organization needs to be verified to use GPT Image models](https://help.openai.com/en/articles/10910291-api-organization-verification)
-
-1.  If you don't have a `.env.local` file, create one.
-2.  Add your OpenAI API key to the `.env.local` file:
-
-    ```dotenv
-    OPENAI_API_KEY=your_openai_api_key_here
-    ```
-
-    **Important:** Keep your API key secret. The `.env.local` file is included in `.gitignore` by default to prevent accidental commits.
-
----
-
-#### 🟡 (Optional) IndexedDB Mode (for serverless hosts) [e.g. Vercel]
-
-For environments where the filesystem is read-only or ephemeral (like Vercel serverless functions), you can configure the application to store generated images directly in the browser's IndexedDB using Dexie.js.
-
-Set the following environment variable in your `.env.local` file or directly in your hosting provider's UI (like Vercel):
-
-```dotenv
-NEXT_PUBLIC_IMAGE_STORAGE_MODE=indexeddb
-```
-
-When this variable is set to `indexeddb`:
-
-- The server API (`/api/images`) will return the image data as base64 (`b64_json`) instead of saving it to disk.
-- The client-side application will decode the base64 data and store the image blob in IndexedDB.
-- Images will be served directly from the browser's storage using Blob URLs.
-
-If this variable is **not set** or has any other value, the application defaults to the standard behavior of saving images to the `./generated-images` directory on the server's filesystem.
-
-**Note:** If `NEXT_PUBLIC_IMAGE_STORAGE_MODE` is not set, the application will automatically detect if it's running on Vercel (using the `VERCEL` or `NEXT_PUBLIC_VERCEL_ENV` environment variables) and default to `indexeddb` mode in that case. Otherwise (e.g., running locally), it defaults to `fs` mode. You can always explicitly set the variable to `fs` or `indexeddb` to override this automatic behavior.
-
-#### 🟡 (Optional) Use a Custom API Endpoint
-
-If you need to use an OpenAI-compatible API endpoint (e.g., a local model server or a different provider), you can specify its base URL using the `OPENAI_API_BASE_URL` environment variable in your `.env.local` file:
-
-```dotenv
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_API_BASE_URL=your_compatible_api_endpoint_here
-```
-
-If `OPENAI_API_BASE_URL` is not set, the application will default to the standard OpenAI API endpoint.
-
----
-
-#### 🟡 Configure Accounts
+### 1. Configure Accounts 🟢
 
 The app uses cookie-based login with an environment-managed administrator and SQLite-backed regular users.
 
@@ -125,9 +74,36 @@ The app uses cookie-based login with an environment-managed administrator and SQ
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=change-me
 JWT_SECRET=use-a-long-random-string
-# Optional for HTTP LAN/local access; defaults are usually correct.
-AUTH_COOKIE_SECURE=false
 ```
+
+`AUTH_SECRET` can be used instead of `JWT_SECRET`. `SQLITE_DB_PATH` is optional if you want to move the SQLite database from the default `./data/app.db`.
+
+After the first admin login, configure runtime settings from `/admin`.
+
+⚠️ [Your OpenAI Organization needs to be verified to use GPT Image models](https://help.openai.com/en/articles/10910291-api-organization-verification)
+
+---
+
+#### 🟡 Runtime Settings
+
+The following settings are managed from the administrator panel and persisted to the `app_settings` SQLite table:
+
+- OpenAI API key
+- OpenAI-compatible base URL
+- Image storage mode: automatic, filesystem, IndexedDB, or Cloudflare R2
+- Cloudflare R2 account ID, access key, secret key, bucket, and optional endpoint
+- Registration enabled
+- Auth cookie secure policy
+
+Legacy environment variables for these values are still read as fallback values when the database setting is empty, but new deployments should use the admin panel.
+
+When storage mode is set to `indexeddb`:
+
+- The server API (`/api/images`) will return the image data as base64 (`b64_json`) instead of saving it to disk.
+- The client-side application will decode the base64 data and store the image blob in IndexedDB.
+- Images will be served directly from the browser's storage using Blob URLs.
+
+When storage mode is set to `r2`, the server stores images in a private Cloudflare R2 bucket using Cloudflare's S3-compatible API. Images are still read through the authenticated `/api/image/:filename` route, so normal user ownership checks continue to apply.
 
 Regular users can register when registration is enabled, and administrators can manage users from `/admin`.
 

@@ -21,6 +21,32 @@ type User = {
 
 type UserPatch = Partial<User> & { password?: string };
 
+type RuntimeSettings = {
+    openaiApiKey: string;
+    openaiBaseUrl: string;
+    imageStorageMode: '' | 'fs' | 'indexeddb' | 'r2';
+    r2AccountId: string;
+    r2AccessKeyId: string;
+    r2SecretAccessKey: string;
+    r2Bucket: string;
+    r2Endpoint: string;
+    authCookieSecure: 'auto' | 'true' | 'false';
+    registrationEnabled: boolean;
+};
+
+const emptyRuntimeSettings: RuntimeSettings = {
+    openaiApiKey: '',
+    openaiBaseUrl: '',
+    imageStorageMode: '',
+    r2AccountId: '',
+    r2AccessKeyId: '',
+    r2SecretAccessKey: '',
+    r2Bucket: '',
+    r2Endpoint: '',
+    authCookieSecure: 'auto',
+    registrationEnabled: true
+};
+
 const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
     month: '2-digit',
     day: '2-digit',
@@ -37,6 +63,8 @@ function formatDate(value: string) {
 export default function AdminPage() {
     const [users, setUsers] = React.useState<User[]>([]);
     const [registrationEnabled, setRegistrationEnabled] = React.useState(true);
+    const [runtimeSettings, setRuntimeSettings] = React.useState<RuntimeSettings>(emptyRuntimeSettings);
+    const [isSavingSettings, setIsSavingSettings] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [message, setMessage] = React.useState<string | null>(null);
     const [newEmail, setNewEmail] = React.useState('');
@@ -83,6 +111,7 @@ export default function AdminPage() {
             const [usersData, settingsData] = await Promise.all([api('/api/admin/users'), api('/api/admin/settings')]);
             setUsers(usersData.users || []);
             setRegistrationEnabled(Boolean(settingsData.registrationEnabled));
+            setRuntimeSettings({ ...emptyRuntimeSettings, ...settingsData });
         } catch (err) {
             setError(err instanceof Error ? err.message : '加载失败');
         }
@@ -141,9 +170,33 @@ export default function AdminPage() {
                 body: JSON.stringify({ registrationEnabled: enabled })
             });
             setRegistrationEnabled(Boolean(data.registrationEnabled));
+            setRuntimeSettings((prev) => ({ ...prev, registrationEnabled: Boolean(data.registrationEnabled) }));
             setMessage(enabled ? '已开启注册。' : '已关闭注册。');
         } catch (err) {
             setError(err instanceof Error ? err.message : '设置失败');
+        }
+    };
+
+    const updateRuntimeSetting = <K extends keyof RuntimeSettings>(key: K, value: RuntimeSettings[K]) => {
+        setRuntimeSettings((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const saveRuntimeSettings = async (event: React.FormEvent) => {
+        event.preventDefault();
+        try {
+            setIsSavingSettings(true);
+            setError(null);
+            const data = await api('/api/admin/settings', {
+                method: 'PATCH',
+                body: JSON.stringify(runtimeSettings)
+            });
+            setRuntimeSettings({ ...emptyRuntimeSettings, ...data });
+            setRegistrationEnabled(Boolean(data.registrationEnabled));
+            setMessage('运行配置已保存。');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '保存配置失败');
+        } finally {
+            setIsSavingSettings(false);
         }
     };
 
@@ -222,6 +275,112 @@ export default function AdminPage() {
                                         onCheckedChange={(checked) => toggleRegistration(Boolean(checked))}
                                     />
                                 </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className='border-white/10 bg-white/[0.04] text-white'>
+                            <CardHeader>
+                                <CardTitle>运行配置</CardTitle>
+                                <CardDescription className='text-white/60'>
+                                    保存后写入数据库。管理员账号、密码和会话密钥仍由部署环境提供。
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <form onSubmit={saveRuntimeSettings} className='space-y-4'>
+                                    <div className='space-y-1.5'>
+                                        <Label htmlFor='openaiApiKey'>OpenAI API Key</Label>
+                                        <Input
+                                            id='openaiApiKey'
+                                            type='password'
+                                            value={runtimeSettings.openaiApiKey}
+                                            onChange={(e) => updateRuntimeSetting('openaiApiKey', e.target.value)}
+                                            placeholder='sk-...'
+                                            className='border-white/20 bg-black/50 text-white'
+                                        />
+                                    </div>
+                                    <div className='space-y-1.5'>
+                                        <Label htmlFor='openaiBaseUrl'>OpenAI Base URL</Label>
+                                        <Input
+                                            id='openaiBaseUrl'
+                                            value={runtimeSettings.openaiBaseUrl}
+                                            onChange={(e) => updateRuntimeSetting('openaiBaseUrl', e.target.value)}
+                                            placeholder='https://api.openai.com/v1'
+                                            className='border-white/20 bg-black/50 text-white'
+                                        />
+                                    </div>
+                                    <div className='grid gap-3 md:grid-cols-2'>
+                                        <div className='space-y-1.5'>
+                                            <Label htmlFor='imageStorageMode'>图片存储</Label>
+                                            <select
+                                                id='imageStorageMode'
+                                                value={runtimeSettings.imageStorageMode}
+                                                onChange={(e) =>
+                                                    updateRuntimeSetting(
+                                                        'imageStorageMode',
+                                                        e.target.value as RuntimeSettings['imageStorageMode']
+                                                    )
+                                                }
+                                                className='h-10 w-full rounded-md border border-white/20 bg-black/50 px-3 text-sm text-white'>
+                                                <option value=''>自动</option>
+                                                <option value='fs'>文件系统</option>
+                                                <option value='indexeddb'>IndexedDB</option>
+                                                <option value='r2'>Cloudflare R2</option>
+                                            </select>
+                                        </div>
+                                        <div className='space-y-1.5'>
+                                            <Label htmlFor='authCookieSecure'>登录 Cookie Secure</Label>
+                                            <select
+                                                id='authCookieSecure'
+                                                value={runtimeSettings.authCookieSecure}
+                                                onChange={(e) =>
+                                                    updateRuntimeSetting(
+                                                        'authCookieSecure',
+                                                        e.target.value as RuntimeSettings['authCookieSecure']
+                                                    )
+                                                }
+                                                className='h-10 w-full rounded-md border border-white/20 bg-black/50 px-3 text-sm text-white'>
+                                                <option value='auto'>自动</option>
+                                                <option value='true'>强制开启</option>
+                                                <option value='false'>强制关闭</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className='grid gap-3 md:grid-cols-2'>
+                                        <RuntimeInput
+                                            label='R2 Account ID'
+                                            value={runtimeSettings.r2AccountId}
+                                            onChange={(value) => updateRuntimeSetting('r2AccountId', value)}
+                                        />
+                                        <RuntimeInput
+                                            label='R2 Bucket'
+                                            value={runtimeSettings.r2Bucket}
+                                            onChange={(value) => updateRuntimeSetting('r2Bucket', value)}
+                                        />
+                                        <RuntimeInput
+                                            label='R2 Access Key ID'
+                                            value={runtimeSettings.r2AccessKeyId}
+                                            onChange={(value) => updateRuntimeSetting('r2AccessKeyId', value)}
+                                        />
+                                        <RuntimeInput
+                                            label='R2 Secret Access Key'
+                                            type='password'
+                                            value={runtimeSettings.r2SecretAccessKey}
+                                            onChange={(value) => updateRuntimeSetting('r2SecretAccessKey', value)}
+                                        />
+                                    </div>
+                                    <RuntimeInput
+                                        label='R2 Endpoint'
+                                        value={runtimeSettings.r2Endpoint}
+                                        onChange={(value) => updateRuntimeSetting('r2Endpoint', value)}
+                                        placeholder='https://account-id.r2.cloudflarestorage.com'
+                                    />
+                                    <Button
+                                        type='submit'
+                                        disabled={isSavingSettings}
+                                        className='w-full bg-white text-black hover:bg-white/90'>
+                                        {isSavingSettings ? '保存中...' : '保存运行配置'}
+                                    </Button>
+                                </form>
                             </CardContent>
                         </Card>
 
@@ -344,6 +503,36 @@ function StatCard({ label, value, helper }: { label: string; value: React.ReactN
                 <div className='mt-1 text-xs text-white/40'>{helper}</div>
             </CardContent>
         </Card>
+    );
+}
+
+function RuntimeInput({
+    label,
+    value,
+    onChange,
+    type = 'text',
+    placeholder
+}: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    type?: string;
+    placeholder?: string;
+}) {
+    const id = React.useId();
+
+    return (
+        <div className='space-y-1.5'>
+            <Label htmlFor={id}>{label}</Label>
+            <Input
+                id={id}
+                type={type}
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                placeholder={placeholder}
+                className='border-white/20 bg-black/50 text-white'
+            />
+        </div>
     );
 }
 
