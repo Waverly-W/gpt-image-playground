@@ -42,3 +42,8 @@ next-env.d.ts
 
 # generated images
 generated-images/
+
+# Local SQLite database
+data/
+*.db
+*.db-*

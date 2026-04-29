@@ -11,7 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import type { GptImageModel } from '@/lib/cost-utils';
+import { IMAGE_MODEL_OPTIONS } from '@/lib/image-models';
 import { getPresetTooltip, validateGptImage2Size } from '@/lib/size-utils';
+import type { SizePreset } from '@/lib/size-utils';
 import {
     Square,
     RectangleHorizontal,
@@ -26,15 +29,10 @@ import {
     Tally3,
     Loader2,
     BrickWall,
-    Lock,
-    LockOpen,
     HelpCircle,
     SquareDashed
 } from 'lucide-react';
 import * as React from 'react';
-
-import type { GptImageModel } from '@/lib/cost-utils';
-import type { SizePreset } from '@/lib/size-utils';
 
 export type GenerationFormData = {
     prompt: string;
@@ -55,9 +53,6 @@ type GenerationFormProps = {
     isLoading: boolean;
     currentMode: 'generate' | 'edit';
     onModeChange: (mode: 'generate' | 'edit') => void;
-    isPasswordRequiredByBackend: boolean | null;
-    clientPasswordHash: string | null;
-    onOpenPasswordDialog: () => void;
     model: GenerationFormData['model'];
     setModel: React.Dispatch<React.SetStateAction<GenerationFormData['model']>>;
     prompt: string;
@@ -115,9 +110,6 @@ export function GenerationForm({
     isLoading,
     currentMode,
     onModeChange,
-    isPasswordRequiredByBackend,
-    clientPasswordHash,
-    onOpenPasswordDialog,
     model,
     setModel,
     prompt,
@@ -201,18 +193,10 @@ export function GenerationForm({
                 <div>
                     <div className='flex items-center'>
                         <CardTitle className='py-1 text-lg font-medium text-white'>Generate Image</CardTitle>
-                        {isPasswordRequiredByBackend && (
-                            <Button
-                                variant='ghost'
-                                size='icon'
-                                onClick={onOpenPasswordDialog}
-                                className='ml-2 text-white/60 hover:text-white'
-                                aria-label='Configure Password'>
-                                {clientPasswordHash ? <Lock className='h-4 w-4' /> : <LockOpen className='h-4 w-4' />}
-                            </Button>
-                        )}
                     </div>
-                    <CardDescription className='mt-1 text-white/60'>Create a new image from a text prompt.</CardDescription>
+                    <CardDescription className='mt-1 text-white/60'>
+                        Create a new image from a text prompt.
+                    </CardDescription>
                 </div>
                 <ModeToggle currentMode={currentMode} onModeChange={onModeChange} />
             </CardHeader>
@@ -223,25 +207,24 @@ export function GenerationForm({
                             Model
                         </Label>
                         <div className='flex items-center gap-4'>
-                            <Select value={model} onValueChange={(value) => setModel(value as GenerationFormData['model'])} disabled={isLoading}>
+                            <Select
+                                value={model}
+                                onValueChange={(value) => setModel(value as GenerationFormData['model'])}
+                                disabled={isLoading}>
                                 <SelectTrigger
                                     id='model-select'
                                     className='w-[180px] rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50'>
                                     <SelectValue placeholder='Select model' />
                                 </SelectTrigger>
-                                <SelectContent className='border-white/20 bg-black text-white'>
-                                    <SelectItem value='gpt-image-2' className='focus:bg-white/10'>
-                                        gpt-image-2
-                                    </SelectItem>
-                                    <SelectItem value='gpt-image-1.5' className='focus:bg-white/10'>
-                                        gpt-image-1.5
-                                    </SelectItem>
-                                    <SelectItem value='gpt-image-1' className='focus:bg-white/10'>
-                                        gpt-image-1
-                                    </SelectItem>
-                                    <SelectItem value='gpt-image-1-mini' className='focus:bg-white/10'>
-                                        gpt-image-1-mini
-                                    </SelectItem>
+                                <SelectContent className='z-[100] border-white/20 bg-black text-white'>
+                                    {IMAGE_MODEL_OPTIONS.map((option) => (
+                                        <SelectItem
+                                            key={option.value}
+                                            value={option.value}
+                                            className='focus:bg-white/10'>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                             <Tooltip>
@@ -252,7 +235,7 @@ export function GenerationForm({
                                             checked={enableStreaming}
                                             onCheckedChange={(checked) => setEnableStreaming(!!checked)}
                                             disabled={isLoading || n[0] > 1}
-                                            className='border-white/40 data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-black disabled:cursor-not-allowed disabled:opacity-50'
+                                            className='border-white/40 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-black'
                                         />
                                         <Label
                                             htmlFor='enable-streaming'
@@ -362,12 +345,7 @@ export function GenerationForm({
                             className='flex flex-wrap gap-x-5 gap-y-3'>
                             <RadioItemWithIcon value='auto' id='size-auto' label='Auto' Icon={Sparkles} />
                             {isGptImage2 && (
-                                <RadioItemWithIcon
-                                    value='custom'
-                                    id='size-custom'
-                                    label='Custom'
-                                    Icon={SquareDashed}
-                                />
+                                <RadioItemWithIcon value='custom' id='size-custom' label='Custom' Icon={SquareDashed} />
                             )}
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -448,7 +426,7 @@ export function GenerationForm({
                                 </div>
                                 <p className='text-xs text-white/50'>
                                     {(customWidth * customHeight).toLocaleString()} pixels (
-                                    {((customWidth * customHeight) / 8_294_400 * 100).toFixed(1)}% of max) ·{' '}
+                                    {(((customWidth * customHeight) / 8_294_400) * 100).toFixed(1)}% of max) ·{' '}
                                     {customWidth > 0 && customHeight > 0
                                         ? `${(Math.max(customWidth, customHeight) / Math.min(customWidth, customHeight)).toFixed(2)}:1 ratio`
                                         : '—'}

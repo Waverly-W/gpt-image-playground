@@ -1,7 +1,9 @@
-import crypto from 'crypto';
 import fs from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import type OpenAI from 'openai';
+import { createOpenAIClient } from '@/lib/openai-config';
+import { recordImageOwner } from '@/lib/image-ownership';
+import { authErrorResponse, requireSession } from '@/lib/server-auth';
 import path from 'path';
 
 // Streaming event types
@@ -23,10 +25,7 @@ type StreamingEvent = {
     error?: string;
 };
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL
-});
+const openai = createOpenAIClient();
 
 const outputDir = path.resolve(process.cwd(), 'generated-images');
 
@@ -69,12 +68,15 @@ async function ensureOutputDirExists() {
     }
 }
 
-function sha256(data: string): string {
-    return crypto.createHash('sha256').update(data).digest('hex');
-}
-
 export async function POST(request: NextRequest) {
     console.log('Received POST request to /api/images');
+
+    let session;
+    try {
+        session = await requireSession();
+    } catch (error) {
+        return authErrorResponse(error) ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     if (!process.env.OPENAI_API_KEY) {
         console.error('OPENAI_API_KEY is not set.');
@@ -103,19 +105,6 @@ export async function POST(request: NextRequest) {
         }
 
         const formData = await request.formData();
-
-        if (process.env.APP_PASSWORD) {
-            const clientPasswordHash = formData.get('passwordHash') as string | null;
-            if (!clientPasswordHash) {
-                console.error('Missing password hash.');
-                return NextResponse.json({ error: 'Unauthorized: Missing password hash.' }, { status: 401 });
-            }
-            const serverPasswordHash = sha256(process.env.APP_PASSWORD);
-            if (clientPasswordHash !== serverPasswordHash) {
-                console.error('Invalid password hash.');
-                return NextResponse.json({ error: 'Unauthorized: Invalid password.' }, { status: 401 });
-            }
-        }
 
         const mode = formData.get('mode') as 'generate' | 'edit' | null;
         const prompt = formData.get('prompt') as string | null;
@@ -217,6 +206,7 @@ export async function POST(request: NextRequest) {
                                         const buffer = Buffer.from(event.b64_json, 'base64');
                                         const filepath = path.join(outputDir, filename);
                                         await fs.writeFile(filepath, buffer);
+                                        recordImageOwner(filename, session.id);
                                         console.log(`Streaming: Saved image ${filename}`);
                                     }
 
@@ -361,6 +351,7 @@ export async function POST(request: NextRequest) {
                                         const buffer = Buffer.from(event.b64_json, 'base64');
                                         const filepath = path.join(outputDir, filename);
                                         await fs.writeFile(filepath, buffer);
+                                        recordImageOwner(filename, session.id);
                                         console.log(`Streaming edit: Saved image ${filename}`);
                                     }
 
@@ -458,6 +449,7 @@ export async function POST(request: NextRequest) {
                     const filepath = path.join(outputDir, filename);
                     console.log(`Attempting to save image to: ${filepath}`);
                     await fs.writeFile(filepath, buffer);
+                    recordImageOwner(filename, session.id);
                     console.log(`Successfully saved image: ${filename}`);
                 } else {
                 }

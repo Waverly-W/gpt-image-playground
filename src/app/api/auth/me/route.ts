@@ -3,5 +3,5 @@ import { getSessionFromCookie } from '@/lib/server-auth';
 
 export async function GET() {
     const user = await getSessionFromCookie();
-    return NextResponse.json({ passwordRequired: false, authenticated: Boolean(user), user });
+    return NextResponse.json({ user, authenticated: Boolean(user) });
 }

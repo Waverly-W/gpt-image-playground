@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+
+const root = new URL('../', import.meta.url);
+const read = (relativePath) => readFileSync(new URL(relativePath, root), 'utf8');
+
+test('legacy APP_PASSWORD client flow is removed from playground UI', () => {
+  const playground = read('src/app/playground-client.tsx');
+  const generationForm = read('src/components/generation-form.tsx');
+  const editingForm = read('src/components/editing-form.tsx');
+  const imageDeleteRoute = read('src/app/api/image-delete/route.ts');
+
+  for (const source of [playground, generationForm, editingForm, imageDeleteRoute]) {
+    assert.equal(source.includes('PasswordDialog'), false);
+    assert.equal(source.includes('clientPasswordHash'), false);
+    assert.equal(source.includes('isPasswordRequiredByBackend'), false);
+    assert.equal(source.includes('onOpenPasswordDialog'), false);
+    assert.equal(source.includes('passwordHash'), false);
+  }
+
+  assert.equal(playground.includes('sha256Client'), false);
+  assert.equal(playground.includes('localStorage.getItem(\'clientPasswordHash\')'), false);
+});
+
+test('admin page exposes a richer dashboard layout instead of raw row editing only', () => {
+  const adminPage = read('src/app/admin/page.tsx');
+
+  assert.match(adminPage, /const activeUsers/);
+  assert.match(adminPage, /const disabledUsers/);
+  assert.match(adminPage, /仪表盘/);
+  assert.match(adminPage, /用户总数/);
+  assert.match(adminPage, /活跃用户/);
+  assert.match(adminPage, /已禁用/);
+  assert.match(adminPage, /最近更新/);
+  assert.match(adminPage, /启用注册|暂停注册/);
+  assert.match(adminPage, /重置密码/);
+});
