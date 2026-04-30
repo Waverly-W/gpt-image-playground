@@ -49,16 +49,14 @@ test('playground uses task queue instead of fixed output preview history layout'
   assert.match(taskQueue, /生成中|排队中|已完成|失败/);
 });
 
-test('playground places task queue on the right and image viewer supports zoom', () => {
+test('playground places task queue on the right and uses Ant Design image preview', () => {
   const playground = read('src/app/playground-client.tsx');
   const taskQueue = read('src/components/task-queue-panel.tsx');
 
   assert.ok(playground.indexOf("data-panel='form'") < playground.indexOf("data-panel='task-queue'"));
-  assert.match(taskQueue, /useState\(1\)/);
-  assert.match(taskQueue, /放大/);
-  assert.match(taskQueue, /缩小/);
-  assert.match(taskQueue, /重置/);
-  assert.match(taskQueue, /max-w-\[96vw\]/);
+  assert.match(taskQueue, /Image as AntImage/);
+  assert.match(taskQueue, /AntImage\.PreviewGroup/);
+  assert.match(taskQueue, /查看大图/);
 });
 
 test('playground uses a fixed sidebar with image generation and prompt gallery views', () => {

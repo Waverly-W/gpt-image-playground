@@ -5,8 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { PromptTemplate, PromptTemplateScene } from '@/lib/prompt-template-data';
+import { Image as AntImage } from 'antd';
 import { ImagePlus, Search, WandSparkles } from 'lucide-react';
-import Image from 'next/image';
 import * as React from 'react';
 
 type PromptTemplateGalleryProps = {
@@ -134,14 +134,17 @@ export function PromptTemplateGallery({ templates, scenes, onImportPrompt }: Pro
                                     key={template.id}
                                     className='overflow-hidden rounded-lg border border-white/10 bg-zinc-950 text-white'>
                                     <div className='aspect-[4/3] overflow-hidden bg-white/5'>
-                                        <Image
+                                        <AntImage
                                             src={template.imageUrl}
                                             alt={template.imageAlt}
-                                            width={640}
-                                            height={480}
                                             loading='lazy'
-                                            unoptimized
+                                            width='100%'
+                                            height='100%'
+                                            rootClassName='block h-full w-full'
                                             className='h-full w-full object-cover'
+                                            preview={{
+                                                mask: '预览图片'
+                                            }}
                                         />
                                     </div>
                                     <CardContent className='space-y-3 p-4'>

@@ -11,10 +11,9 @@ const themeProvider = fs.readFileSync(new URL('../src/components/theme-provider.
 const rootLayout = fs.readFileSync(new URL('../src/app/layout.tsx', import.meta.url), 'utf8');
 const nextConfig = fs.readFileSync(new URL('../next.config.ts', import.meta.url), 'utf8');
 
-test('prompt template gallery uses next image with the configured R2 image host', () => {
-    assert.match(promptTemplateGallery, /from 'next\/image'/);
-    assert.match(promptTemplateGallery, /<Image/);
-    assert.match(promptTemplateGallery, /unoptimized/);
+test('prompt template gallery uses the configured R2 image host', () => {
+    assert.match(promptTemplateGallery, /from 'antd'/);
+    assert.match(promptTemplateGallery, /<AntImage/);
     assert.match(nextConfig, /pic\.waverlywang\.top/);
 });
 
@@ -23,6 +22,19 @@ test('prompt template gallery keeps scene filters in a visible content sidebar',
     assert.match(promptTemplateGallery, /scene\.count\.toLocaleString\(\)/);
     assert.match(promptTemplateGallery, /filteredTemplates\.length\.toLocaleString\(\)/);
     assert.doesNotMatch(promptTemplateGallery, /Select value=\{sceneSlug\}/);
+});
+
+test('prompt template gallery uses Ant Design image preview', () => {
+    assert.match(promptTemplateGallery, /import \{ Image as AntImage \} from 'antd'/);
+    assert.match(promptTemplateGallery, /preview=\{\{\s*mask: '预览图片'/);
+});
+
+test('task queue image preview uses Ant Design preview group', () => {
+    const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
+
+    assert.match(taskQueuePanel, /import \{ Image as AntImage \} from 'antd'/);
+    assert.match(taskQueuePanel, /<AntImage\.PreviewGroup/);
+    assert.doesNotMatch(taskQueuePanel, /DialogContent/);
 });
 
 test('mode toggle renders as a prominent sliding tab control', () => {

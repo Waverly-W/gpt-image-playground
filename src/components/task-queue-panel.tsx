@@ -2,22 +2,9 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import type { CostDetails, GptImageModel } from '@/lib/cost-utils';
-import {
-    CheckCircle2,
-    Clock3,
-    Cloud,
-    ImageIcon,
-    Layers,
-    Loader2,
-    Minus,
-    Plus,
-    RotateCcw,
-    Trash2,
-    XCircle
-} from 'lucide-react';
-import Image from 'next/image';
+import { Image as AntImage } from 'antd';
+import { CheckCircle2, Clock3, Cloud, ImageIcon, Layers, Loader2, Trash2, XCircle } from 'lucide-react';
 import * as React from 'react';
 
 export type QueueImageJob = {
@@ -94,98 +81,37 @@ function TaskStatusBadge({ status }: { status: QueueImageJob['status'] }) {
 
 function JobPreview({ job }: { job: QueueImageJob }) {
     const firstImage = job.images[0];
-    const [zoom, setZoom] = React.useState(1);
-
-    const zoomOut = () => setZoom((current) => Math.max(0.5, Math.round((current - 0.25) * 100) / 100));
-    const zoomIn = () => setZoom((current) => Math.min(4, Math.round((current + 0.25) * 100) / 100));
 
     if (job.status === 'completed' && firstImage) {
         return (
-            <Dialog onOpenChange={() => setZoom(1)}>
-                <DialogTrigger asChild>
-                    <button
-                        type='button'
-                        className='relative aspect-square w-24 shrink-0 overflow-hidden rounded-md border border-white/15 bg-neutral-900 focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black focus:outline-none'
-                        aria-label='查看大图'>
-                        <Image
-                            src={imageSrc(firstImage)}
-                            alt='任务缩略图'
-                            fill
-                            sizes='96px'
-                            className='object-cover'
-                            unoptimized
-                        />
-                        {job.images.length > 1 && (
-                            <span className='absolute right-1 bottom-1 inline-flex items-center gap-1 rounded bg-black/75 px-1.5 py-0.5 text-xs text-white'>
-                                <Layers className='h-3 w-3' />
-                                {job.images.length}
-                            </span>
-                        )}
-                    </button>
-                </DialogTrigger>
-                <DialogContent className='flex max-h-[96vh] max-w-[96vw] flex-col border-neutral-700 bg-neutral-950 text-white sm:max-w-[96vw]'>
-                    <DialogHeader className='shrink-0'>
-                        <DialogTitle>查看大图</DialogTitle>
-                    </DialogHeader>
-                    <div className='flex shrink-0 flex-wrap items-center gap-2 border-b border-white/10 pb-3'>
-                        <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={zoomOut}
-                            disabled={zoom <= 0.5}
-                            className='h-9 border-white/20 bg-neutral-900 text-white hover:bg-white/10'>
-                            <Minus className='mr-1.5 h-4 w-4' />
-                            缩小
-                        </Button>
-                        <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={zoomIn}
-                            disabled={zoom >= 4}
-                            className='h-9 border-white/20 bg-neutral-900 text-white hover:bg-white/10'>
-                            <Plus className='mr-1.5 h-4 w-4' />
-                            放大
-                        </Button>
-                        <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={() => setZoom(1)}
-                            className='h-9 border-white/20 bg-neutral-900 text-white hover:bg-white/10'>
-                            <RotateCcw className='mr-1.5 h-4 w-4' />
-                            重置
-                        </Button>
-                        <span className='rounded border border-white/10 px-2 py-1 text-sm text-white/60'>
-                            {Math.round(zoom * 100)}%
+            <AntImage.PreviewGroup
+                items={job.images.map((image) => ({
+                    src: imageSrc(image),
+                    alt: '生成结果大图'
+                }))}
+                preview={{
+                    countRender: (current, total) => `${current} / ${total}`
+                }}>
+                <div className='relative aspect-square w-24 shrink-0 overflow-hidden rounded-md border border-white/15 bg-neutral-900 focus-within:ring-2 focus-within:ring-white focus-within:ring-offset-2 focus-within:ring-offset-black'>
+                    <AntImage
+                        src={imageSrc(firstImage)}
+                        alt='任务缩略图'
+                        width='100%'
+                        height='100%'
+                        rootClassName='block h-full w-full'
+                        className='h-full w-full object-cover'
+                        preview={{
+                            mask: '查看大图'
+                        }}
+                    />
+                    {job.images.length > 1 && (
+                        <span className='pointer-events-none absolute right-1 bottom-1 inline-flex items-center gap-1 rounded bg-black/75 px-1.5 py-0.5 text-xs text-white'>
+                            <Layers className='h-3 w-3' />
+                            {job.images.length}
                         </span>
-                    </div>
-                    <div className='grid min-h-0 flex-1 gap-3 overflow-auto sm:grid-cols-2'>
-                        {job.images.map((image) => (
-                            <div
-                                key={image.filename}
-                                className='relative flex min-h-[72vh] items-center justify-center overflow-auto rounded-md border border-white/10 bg-black p-4'>
-                                <Image
-                                    src={imageSrc(image)}
-                                    alt='生成结果大图'
-                                    width={1024}
-                                    height={1024}
-                                    sizes='(max-width: 768px) 100vw, 50vw'
-                                    style={{
-                                        width: `${zoom * 100}%`,
-                                        height: `${zoom * 100}%`,
-                                        maxWidth: zoom === 1 ? '100%' : 'none',
-                                        maxHeight: zoom === 1 ? '100%' : 'none'
-                                    }}
-                                    className='object-contain'
-                                    unoptimized
-                                />
-                            </div>
-                        ))}
-                    </div>
-                </DialogContent>
-            </Dialog>
+                    )}
+                </div>
+            </AntImage.PreviewGroup>
         );
     }
 
