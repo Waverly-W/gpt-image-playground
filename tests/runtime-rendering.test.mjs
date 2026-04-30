@@ -23,6 +23,7 @@ test('mode toggle renders as a prominent sliding tab control', () => {
     assert.match(modeToggle, /translate-x-full/);
     assert.match(modeToggle, /min-h-11/);
     assert.match(modeToggle, /shadow/);
+    assert.match(modeToggle, /data-\[state=active\]:!text-neutral-950/);
 });
 
 test('theme provider does not inject next-themes script during client rendering', () => {

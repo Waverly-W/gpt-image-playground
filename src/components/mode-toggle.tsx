@@ -24,15 +24,17 @@ export function ModeToggle({ currentMode, onModeChange }: ModeToggleProps) {
                 />
                 <TabsTrigger
                     value='generate'
-                    className={`relative z-10 min-h-11 rounded-full border border-transparent px-4 text-sm font-semibold transition-colors duration-200 ${
-                        currentMode === 'generate' ? 'text-black' : 'text-white/65 hover:bg-white/10 hover:text-white'
+                    className={`relative z-10 min-h-11 rounded-full border border-transparent px-4 text-sm font-bold transition-colors duration-200 data-[state=active]:!text-neutral-950 dark:data-[state=active]:!text-neutral-950 ${
+                        currentMode === 'generate'
+                            ? 'text-neutral-950'
+                            : 'text-white/65 hover:bg-white/10 hover:text-white'
                     }`}>
                     生成
                 </TabsTrigger>
                 <TabsTrigger
                     value='edit'
-                    className={`relative z-10 min-h-11 rounded-full border border-transparent px-4 text-sm font-semibold transition-colors duration-200 ${
-                        isEditMode ? 'text-black' : 'text-white/65 hover:bg-white/10 hover:text-white'
+                    className={`relative z-10 min-h-11 rounded-full border border-transparent px-4 text-sm font-bold transition-colors duration-200 data-[state=active]:!text-neutral-950 dark:data-[state=active]:!text-neutral-950 ${
+                        isEditMode ? 'text-neutral-950' : 'text-white/65 hover:bg-white/10 hover:text-white'
                     }`}>
                     编辑
                 </TabsTrigger>
