@@ -1,7 +1,9 @@
 import { getRuntimeConfig, type ImageStorageMode } from './settings';
+import type { RuntimeConfig } from './settings';
 import {
     DeleteObjectCommand,
     GetObjectCommand,
+    HeadBucketCommand,
     PutObjectCommand,
     S3Client,
     type GetObjectCommandOutput
@@ -38,8 +40,7 @@ function requireConfigValue(value: string): string | null {
     return normalized ? normalized : null;
 }
 
-export function getR2Config(): R2Config {
-    const runtimeConfig = getRuntimeConfig();
+export function getR2ConfigFromRuntimeConfig(runtimeConfig: RuntimeConfig): R2Config {
     const values = {
         accountId: requireConfigValue(runtimeConfig.r2AccountId),
         accessKeyId: requireConfigValue(runtimeConfig.r2AccessKeyId),
@@ -71,6 +72,10 @@ export function getR2Config(): R2Config {
     };
 }
 
+export function getR2Config(): R2Config {
+    return getR2ConfigFromRuntimeConfig(getRuntimeConfig());
+}
+
 function createR2Client(config: R2Config): S3Client {
     return new S3Client({
         region: 'auto',
@@ -81,6 +86,15 @@ function createR2Client(config: R2Config): S3Client {
         },
         forcePathStyle: true
     });
+}
+
+export async function testR2Connection(runtimeConfig: RuntimeConfig): Promise<void> {
+    const config = getR2ConfigFromRuntimeConfig(runtimeConfig);
+    await createR2Client(config).send(
+        new HeadBucketCommand({
+            Bucket: config.bucket
+        })
+    );
 }
 
 export async function putR2Image(filename: string, body: Buffer, contentType?: string): Promise<void> {

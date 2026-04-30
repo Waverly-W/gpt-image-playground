@@ -65,6 +65,7 @@ export default function AdminPage() {
     const [registrationEnabled, setRegistrationEnabled] = React.useState(true);
     const [runtimeSettings, setRuntimeSettings] = React.useState<RuntimeSettings>(emptyRuntimeSettings);
     const [isSavingSettings, setIsSavingSettings] = React.useState(false);
+    const [isTestingR2, setIsTestingR2] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [message, setMessage] = React.useState<string | null>(null);
     const [newEmail, setNewEmail] = React.useState('');
@@ -197,6 +198,22 @@ export default function AdminPage() {
             setError(err instanceof Error ? err.message : '保存配置失败');
         } finally {
             setIsSavingSettings(false);
+        }
+    };
+
+    const testR2Settings = async () => {
+        try {
+            setIsTestingR2(true);
+            setError(null);
+            await api('/api/admin/settings/r2-test', {
+                method: 'POST',
+                body: JSON.stringify(runtimeSettings)
+            });
+            setMessage('R2 连接测试成功。');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'R2 连接测试失败');
+        } finally {
+            setIsTestingR2(false);
         }
     };
 
@@ -374,12 +391,22 @@ export default function AdminPage() {
                                         onChange={(value) => updateRuntimeSetting('r2Endpoint', value)}
                                         placeholder='https://account-id.r2.cloudflarestorage.com'
                                     />
-                                    <Button
-                                        type='submit'
-                                        disabled={isSavingSettings}
-                                        className='w-full bg-white text-black hover:bg-white/90'>
-                                        {isSavingSettings ? '保存中...' : '保存运行配置'}
-                                    </Button>
+                                    <div className='grid gap-3 md:grid-cols-2'>
+                                        <Button
+                                            type='button'
+                                            variant='outline'
+                                            disabled={isSavingSettings || isTestingR2}
+                                            onClick={testR2Settings}
+                                            className='border-white/20 bg-black/40 text-white hover:bg-white/10'>
+                                            {isTestingR2 ? '测试中...' : '测试 R2 连接'}
+                                        </Button>
+                                        <Button
+                                            type='submit'
+                                            disabled={isSavingSettings || isTestingR2}
+                                            className='bg-white text-black hover:bg-white/90'>
+                                            {isSavingSettings ? '保存中...' : '保存运行配置'}
+                                        </Button>
+                                    </div>
                                 </form>
                             </CardContent>
                         </Card>
