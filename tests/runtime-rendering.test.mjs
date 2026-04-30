@@ -13,6 +13,7 @@ const nextConfig = fs.readFileSync(new URL('../next.config.ts', import.meta.url)
 test('prompt template gallery uses next image with the configured R2 image host', () => {
     assert.match(promptTemplateGallery, /from 'next\/image'/);
     assert.match(promptTemplateGallery, /<Image/);
+    assert.match(promptTemplateGallery, /unoptimized/);
     assert.match(nextConfig, /pic\.waverlywang\.top/);
 });
 

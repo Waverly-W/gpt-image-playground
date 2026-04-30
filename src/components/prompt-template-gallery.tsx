@@ -105,6 +105,7 @@ export function PromptTemplateGallery({ templates, scenes, onImportPrompt }: Pro
                                     width={640}
                                     height={480}
                                     loading='lazy'
+                                    unoptimized
                                     className='h-full w-full object-cover'
                                 />
                             </div>
