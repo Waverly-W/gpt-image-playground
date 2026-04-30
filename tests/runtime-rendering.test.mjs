@@ -18,10 +18,17 @@ test('prompt template gallery uses next image with the configured R2 image host'
     assert.match(nextConfig, /pic\.waverlywang\.top/);
 });
 
+test('prompt template gallery keeps scene filters in a visible content sidebar', () => {
+    assert.match(promptTemplateGallery, /aria-label='提示词场景筛选'/);
+    assert.match(promptTemplateGallery, /scene\.count\.toLocaleString\(\)/);
+    assert.match(promptTemplateGallery, /filteredTemplates\.length\.toLocaleString\(\)/);
+    assert.doesNotMatch(promptTemplateGallery, /Select value=\{sceneSlug\}/);
+});
+
 test('mode toggle renders as a prominent sliding tab control', () => {
     assert.match(modeToggle, /aria-hidden='true'/);
     assert.match(modeToggle, /translate-x-full/);
-    assert.match(modeToggle, /min-h-11/);
+    assert.match(modeToggle, /h-10 min-h-0/);
     assert.match(modeToggle, /shadow/);
     assert.match(modeToggle, /data-\[state=active\]:!text-neutral-950/);
 });
