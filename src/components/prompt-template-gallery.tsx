@@ -128,7 +128,7 @@ export function PromptTemplateGallery({ templates, scenes, onImportPrompt }: Pro
                     </div>
 
                     {filteredTemplates.length > 0 ? (
-                        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'>
+                        <div className='grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4'>
                             {filteredTemplates.map((template) => (
                                 <Card
                                     key={template.id}

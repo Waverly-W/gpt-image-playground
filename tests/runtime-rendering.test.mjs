@@ -29,6 +29,11 @@ test('prompt template gallery uses Ant Design image preview', () => {
     assert.match(promptTemplateGallery, /preview=\{\{\s*mask: '预览图片'/);
 });
 
+test('prompt template gallery card grid adapts to available width', () => {
+    assert.match(promptTemplateGallery, /repeat\(auto-fit,minmax\(min\(100%,18rem\),1fr\)\)/);
+    assert.doesNotMatch(promptTemplateGallery, /sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4/);
+});
+
 test('task queue image preview uses Ant Design preview group', () => {
     const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
 
