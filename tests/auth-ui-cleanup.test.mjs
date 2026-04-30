@@ -60,3 +60,10 @@ test('playground places task queue on the right and image viewer supports zoom',
   assert.match(taskQueue, /重置/);
   assert.match(taskQueue, /max-w-\[96vw\]/);
 });
+
+test('task queue shows an R2 badge for R2-backed image jobs', () => {
+  const taskQueue = read('src/components/task-queue-panel.tsx');
+
+  assert.match(taskQueue, /storageModeUsed === 'r2'/);
+  assert.match(taskQueue, /R2/);
+});

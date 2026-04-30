@@ -4,7 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import type { CostDetails, GptImageModel } from '@/lib/cost-utils';
-import { CheckCircle2, Clock3, ImageIcon, Layers, Loader2, Minus, Plus, RotateCcw, Trash2, XCircle } from 'lucide-react';
+import {
+    CheckCircle2,
+    Clock3,
+    Cloud,
+    ImageIcon,
+    Layers,
+    Loader2,
+    Minus,
+    Plus,
+    RotateCcw,
+    Trash2,
+    XCircle
+} from 'lucide-react';
 import Image from 'next/image';
 import * as React from 'react';
 
@@ -225,6 +237,12 @@ export function TaskQueuePanel({ jobs, onClearQueue }: TaskQueuePanelProps) {
                                         <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
                                             {job.model}
                                         </span>
+                                        {job.storageModeUsed === 'r2' && (
+                                            <span className='inline-flex items-center gap-1 rounded-full border border-orange-400/30 bg-orange-500/10 px-2 py-0.5 text-xs text-orange-200'>
+                                                <Cloud className='h-3.5 w-3.5' />
+                                                R2
+                                            </span>
+                                        )}
                                     </div>
                                     <p className='line-clamp-2 text-sm leading-5 text-white/85'>{job.prompt}</p>
                                     <div className='flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/45'>
