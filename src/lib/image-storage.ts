@@ -3,6 +3,7 @@ import type { RuntimeConfig } from './settings';
 import {
     DeleteObjectCommand,
     GetObjectCommand,
+    HeadObjectCommand,
     HeadBucketCommand,
     PutObjectCommand,
     S3Client,
@@ -115,6 +116,35 @@ export async function putR2Image(
             ContentType: contentType || lookup(filename) || 'application/octet-stream'
         })
     );
+}
+
+export async function r2ObjectExists(filename: string, runtimeConfig?: RuntimeConfig): Promise<boolean> {
+    const config = runtimeConfig ? getR2ConfigFromRuntimeConfig(runtimeConfig) : getR2Config();
+
+    try {
+        await createR2Client(config).send(
+            new HeadObjectCommand({
+                Bucket: config.bucket,
+                Key: filename
+            })
+        );
+        return true;
+    } catch (error: unknown) {
+        if (
+            typeof error === 'object' &&
+            error !== null &&
+            (('name' in error && error.name === 'NotFound') ||
+                ('$metadata' in error &&
+                    typeof error.$metadata === 'object' &&
+                    error.$metadata !== null &&
+                    'httpStatusCode' in error.$metadata &&
+                    error.$metadata.httpStatusCode === 404))
+        ) {
+            return false;
+        }
+
+        throw error;
+    }
 }
 
 export function getR2PublicUrl(key: string, runtimeConfig: RuntimeConfig = getRuntimeConfig()): string | null {

@@ -36,6 +36,7 @@ test('sync helper reports progress while uploading prompt template images', asyn
         {
             uploads: sync.listPromptTemplateUploads().slice(0, 2),
             readFile: async () => Buffer.from('image'),
+            objectExists: async () => false,
             uploadObject: async (key) => {
                 uploadedKeys.push(key);
             },
@@ -53,4 +54,44 @@ test('sync helper reports progress while uploading prompt template images', asyn
     assert.equal(progressEvents.length, 2);
     assert.deepEqual(progressEvents.map((event) => event.completed), [1, 2]);
     assert.equal(progressEvents[0].total, 2);
+});
+
+test('sync helper skips files that already exist in R2', async () => {
+    const uploadedKeys = [];
+    const progressEvents = [];
+
+    const result = await sync.syncPromptTemplateImagesToR2(
+        {
+            openaiApiKey: '',
+            openaiBaseUrl: '',
+            imageStorageMode: 'r2',
+            r2AccountId: 'account',
+            r2AccessKeyId: 'access',
+            r2SecretAccessKey: 'secret',
+            r2Bucket: 'bucket',
+            r2Endpoint: 'https://account.r2.cloudflarestorage.com',
+            r2PublicBaseUrl: 'https://cdn.example/assets',
+            authCookieSecure: 'auto',
+            registrationEnabled: true
+        },
+        {
+            uploads: sync.listPromptTemplateUploads().slice(0, 2),
+            readFile: async () => Buffer.from('image'),
+            objectExists: async (key) =>
+                key === 'prompt-templates/ai-outfit-upgrade-report__french-parisian-style-reset.webp',
+            uploadObject: async (key) => {
+                uploadedKeys.push(key);
+            },
+            onProgress: (event) => {
+                progressEvents.push(event);
+            }
+        }
+    );
+
+    assert.deepEqual(uploadedKeys, [
+        'prompt-templates/ai-outfit-upgrade-report__german-minimal-streetwear-scorecard.webp'
+    ]);
+    assert.equal(result.uploaded, 1);
+    assert.equal(result.skipped, 1);
+    assert.deepEqual(progressEvents.map((event) => event.skipped), [1, 1]);
 });

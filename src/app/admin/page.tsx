@@ -39,6 +39,8 @@ type PromptTemplateSyncStatus = {
     status: 'idle' | 'running' | 'completed' | 'failed';
     completed: number;
     total: number;
+    uploaded: number;
+    skipped: number;
     currentFilename: string | null;
     error: string | null;
     startedAt: string | null;
@@ -148,7 +150,9 @@ export default function AdminPage() {
 
                 if (data.status === 'completed') {
                     setIsSyncingPromptTemplates(false);
-                    setMessage(`模板图片已上传到 R2，共 ${data.completed ?? 0} 张。`);
+                    setMessage(
+                        `模板图片同步完成：上传 ${data.uploaded ?? 0} 张，跳过 ${data.skipped ?? 0} 张。`
+                    );
                 } else if (data.status === 'failed') {
                     setIsSyncingPromptTemplates(false);
                     setError(data.error || '上传模板图片失败');
@@ -492,6 +496,9 @@ export default function AdminPage() {
                                                     已上传 {promptTemplateSyncStatus.completed} / {promptTemplateSyncStatus.total} 张
                                                 </span>
                                             </div>
+                                            <p className='mt-2 text-white/50'>
+                                                实际上传 {promptTemplateSyncStatus.uploaded} 张，跳过已存在 {promptTemplateSyncStatus.skipped} 张
+                                            </p>
                                             {promptTemplateSyncStatus.currentFilename && (
                                                 <p className='mt-2 truncate text-white/50'>
                                                     当前文件：{promptTemplateSyncStatus.currentFilename}
