@@ -42,6 +42,29 @@ function requireConfigValue(value: string): string | null {
     return normalized ? normalized : null;
 }
 
+function normalizeR2PublicBaseUrl(publicBaseUrl: string, bucket?: string | null): string {
+    const trimmed = publicBaseUrl.trim().replace(/\/+$/, '');
+    if (!trimmed || !bucket?.trim()) {
+        return trimmed;
+    }
+
+    try {
+        const url = new URL(trimmed);
+        const bucketSegment = bucket.trim().replace(/^\/+|\/+$/g, '');
+        const pathSegments = url.pathname.split('/').filter(Boolean);
+
+        if (pathSegments.at(-1) === bucketSegment) {
+            pathSegments.pop();
+            url.pathname = pathSegments.length > 0 ? `/${pathSegments.join('/')}` : '';
+            return url.toString().replace(/\/+$/, '');
+        }
+    } catch {
+        return trimmed;
+    }
+
+    return trimmed;
+}
+
 export function getR2ConfigFromRuntimeConfig(runtimeConfig: RuntimeConfig): R2Config {
     const values = {
         accountId: requireConfigValue(runtimeConfig.r2AccountId),
@@ -64,7 +87,7 @@ export function getR2ConfigFromRuntimeConfig(runtimeConfig: RuntimeConfig): R2Co
     }
 
     const endpoint = runtimeConfig.r2Endpoint.trim() || `https://${values.accountId}.r2.cloudflarestorage.com`;
-    const publicBaseUrl = runtimeConfig.r2PublicBaseUrl.trim().replace(/\/+$/, '');
+    const publicBaseUrl = normalizeR2PublicBaseUrl(runtimeConfig.r2PublicBaseUrl, values.bucket);
 
     return {
         accountId: values.accountId!,
@@ -148,7 +171,7 @@ export async function r2ObjectExists(filename: string, runtimeConfig?: RuntimeCo
 }
 
 export function getR2PublicUrl(key: string, runtimeConfig: RuntimeConfig = getRuntimeConfig()): string | null {
-    const publicBaseUrl = runtimeConfig.r2PublicBaseUrl.trim().replace(/\/+$/, '');
+    const publicBaseUrl = normalizeR2PublicBaseUrl(runtimeConfig.r2PublicBaseUrl, runtimeConfig.r2Bucket);
     if (!publicBaseUrl) {
         return null;
     }

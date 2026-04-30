@@ -66,3 +66,24 @@ test('prefers R2 public URLs for prompt templates when configured', () => {
         'https://cdn.example/assets/prompt-templates/ai-outfit-upgrade-report__french-parisian-style-reset.webp'
     );
 });
+
+test('omits bucket segment from R2 custom domain template URLs', () => {
+    const templates = promptTemplates.getPromptTemplates({
+        openaiApiKey: '',
+        openaiBaseUrl: '',
+        imageStorageMode: 'r2',
+        r2AccountId: 'account',
+        r2AccessKeyId: 'access',
+        r2SecretAccessKey: 'secret',
+        r2Bucket: 'image-2',
+        r2Endpoint: 'https://account.r2.cloudflarestorage.com',
+        r2PublicBaseUrl: 'https://pic.waverlywang.top/image-2/',
+        authCookieSecure: 'auto',
+        registrationEnabled: true
+    });
+
+    assert.equal(
+        templates[0].imageUrl,
+        'https://pic.waverlywang.top/prompt-templates/ai-outfit-upgrade-report__french-parisian-style-reset.webp'
+    );
+});
