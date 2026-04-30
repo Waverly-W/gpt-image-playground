@@ -9,6 +9,17 @@ import { type SessionUser } from '@/lib/auth';
 import type { CostDetails, GptImageModel } from '@/lib/cost-utils';
 import type { PromptTemplate, PromptTemplateScene } from '@/lib/prompt-template-data';
 import { getPresetDimensions } from '@/lib/size-utils';
+import {
+    Images,
+    LayoutDashboard,
+    LogOut,
+    Menu,
+    PanelLeftClose,
+    PanelLeftOpen,
+    Shield,
+    WandSparkles,
+    X
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -39,6 +50,8 @@ type DrawnPoint = {
     size: number;
 };
 
+type ActiveSection = 'generate' | 'gallery';
+
 const MAX_EDIT_IMAGES = 10;
 
 export default function ImagePlaygroundClient({
@@ -51,6 +64,9 @@ export default function ImagePlaygroundClient({
     promptTemplateScenes: PromptTemplateScene[];
 }) {
     const [mode, setMode] = React.useState<'generate' | 'edit'>('generate');
+    const [activeSection, setActiveSection] = React.useState<ActiveSection>('generate');
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
     const [isCreatingJob, setIsCreatingJob] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [jobs, setJobs] = React.useState<QueueImageJob[]>([]);
@@ -245,153 +261,254 @@ export default function ImagePlaygroundClient({
         }
     }, []);
 
+    const handleNavigate = React.useCallback((section: ActiveSection) => {
+        setActiveSection(section);
+        setIsMobileSidebarOpen(false);
+    }, []);
+
     const handleImportPromptTemplate = React.useCallback((prompt: string) => {
+        setActiveSection('generate');
         setMode('generate');
         setGenPrompt(prompt);
+        setIsMobileSidebarOpen(false);
         formPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, []);
 
+    const navItems = [
+        { id: 'generate' as const, label: '图片生成', Icon: Images },
+        { id: 'gallery' as const, label: '提示词画廊', Icon: WandSparkles }
+    ];
+
+    const sidebarContent = (
+        <div className='flex h-full flex-col bg-neutral-950 text-white'>
+            <div className='flex min-h-16 items-center justify-between gap-3 border-b border-white/10 px-4'>
+                <div className={`min-w-0 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
+                    <p className='text-xs font-medium tracking-normal text-white/45 uppercase'>GPT Image</p>
+                    <p className='truncate text-sm font-semibold text-white'>Playground</p>
+                </div>
+                <button
+                    type='button'
+                    onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
+                    className='hidden min-h-10 min-w-10 items-center justify-center rounded-md text-white/60 transition-colors hover:bg-white/10 hover:text-white lg:inline-flex'
+                    aria-label={isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}>
+                    {isSidebarCollapsed ? (
+                        <PanelLeftOpen className='h-5 w-5' />
+                    ) : (
+                        <PanelLeftClose className='h-5 w-5' />
+                    )}
+                </button>
+                <button
+                    type='button'
+                    onClick={() => setIsMobileSidebarOpen(false)}
+                    className='inline-flex min-h-10 min-w-10 items-center justify-center rounded-md text-white/60 transition-colors hover:bg-white/10 hover:text-white lg:hidden'
+                    aria-label='关闭侧边栏'>
+                    <X className='h-5 w-5' />
+                </button>
+            </div>
+
+            <nav className='flex flex-1 flex-col gap-2 px-3 py-4' aria-label='主导航'>
+                {navItems.map(({ id, label, Icon }) => {
+                    const isActive = activeSection === id;
+
+                    return (
+                        <button
+                            key={id}
+                            type='button'
+                            onClick={() => handleNavigate(id)}
+                            aria-current={isActive ? 'page' : undefined}
+                            className={`flex min-h-11 items-center gap-3 rounded-md px-3 text-left text-sm transition-colors ${
+                                isActive ? 'bg-white text-black' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                            } ${isSidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}`}>
+                            <Icon className='h-5 w-5 shrink-0' aria-hidden='true' />
+                            <span className={isSidebarCollapsed ? 'lg:sr-only' : ''}>{label}</span>
+                        </button>
+                    );
+                })}
+            </nav>
+
+            <div className='border-t border-white/10 p-3'>
+                <div
+                    className={`mb-3 rounded-md border border-white/10 bg-black px-3 py-2 ${
+                        isSidebarCollapsed ? 'lg:hidden' : ''
+                    }`}>
+                    <span className='block truncate text-sm text-white/75'>{initialUser.email}</span>
+                    <span className='text-xs text-white/40'>{initialUser.role === 'admin' ? '管理员' : '用户'}</span>
+                </div>
+                <div className='flex flex-col gap-2'>
+                    {initialUser.role === 'admin' && (
+                        <Link
+                            href='/admin'
+                            className={`flex min-h-10 items-center gap-3 rounded-md px-3 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white ${
+                                isSidebarCollapsed ? 'lg:justify-center lg:px-0' : ''
+                            }`}>
+                            <Shield className='h-4 w-4 shrink-0' aria-hidden='true' />
+                            <span className={isSidebarCollapsed ? 'lg:sr-only' : ''}>管理员面板</span>
+                        </Link>
+                    )}
+                    <button
+                        type='button'
+                        onClick={handleLogout}
+                        className={`flex min-h-10 items-center gap-3 rounded-md px-3 text-left text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white ${
+                            isSidebarCollapsed ? 'lg:justify-center lg:px-0' : ''
+                        }`}>
+                        <LogOut className='h-4 w-4 shrink-0' aria-hidden='true' />
+                        <span className={isSidebarCollapsed ? 'lg:sr-only' : ''}>退出登录</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <main className='min-h-screen bg-black text-white'>
-            <div className='mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4 py-4 md:px-6 md:py-6 lg:px-8'>
-                <header className='flex flex-col gap-4 rounded-lg border border-white/10 bg-neutral-950/80 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5'>
-                    <div className='min-w-0'>
-                        <p className='text-xs font-medium tracking-normal text-white/45 uppercase'>
-                            GPT Image Playground
-                        </p>
-                        <h1 className='mt-1 text-2xl font-semibold text-white'>图片生成工作台</h1>
-                        <p className='mt-1 max-w-2xl text-sm leading-6 text-white/60'>
-                            左侧配置生成或编辑参数，右侧查看任务进度和结果，下方可导入提示词模板。
-                        </p>
-                    </div>
-                    <div className='flex flex-col gap-3 text-sm text-white/65 sm:flex-row sm:items-center'>
-                        <div className='min-w-0 rounded-md border border-white/10 bg-black px-3 py-2'>
-                            <span className='block truncate'>{initialUser.email}</span>
-                            <span className='text-xs text-white/40'>
-                                {initialUser.role === 'admin' ? '管理员' : '用户'}
-                            </span>
-                        </div>
-                        <div className='flex items-center gap-3'>
-                            {initialUser.role === 'admin' && (
-                                <Link
-                                    href='/admin'
-                                    className='rounded-md border border-white/15 px-3 py-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white'>
-                                    管理员面板
-                                </Link>
-                            )}
-                            <button
-                                type='button'
-                                onClick={handleLogout}
-                                className='rounded-md border border-white/15 px-3 py-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white'>
-                                退出登录
-                            </button>
+            {isMobileSidebarOpen && (
+                <button
+                    type='button'
+                    className='fixed inset-0 z-40 bg-black/70 lg:hidden'
+                    onClick={() => setIsMobileSidebarOpen(false)}
+                    aria-label='关闭侧边栏遮罩'
+                />
+            )}
+
+            <aside
+                className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-white/10 transition-transform duration-200 lg:translate-x-0 ${
+                    isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                } ${isSidebarCollapsed ? 'lg:w-20' : 'lg:w-64'}`}>
+                {sidebarContent}
+            </aside>
+
+            <div
+                className={`min-h-screen transition-[padding] duration-200 ${
+                    isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+                }`}>
+                <header className='sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-white/10 bg-black/95 px-4 backdrop-blur md:px-6 lg:px-8'>
+                    <div className='flex min-w-0 items-center gap-3'>
+                        <button
+                            type='button'
+                            onClick={() => setIsMobileSidebarOpen(true)}
+                            className='inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border border-white/10 text-white/70 transition-colors hover:bg-white/10 hover:text-white lg:hidden'
+                            aria-label='打开侧边栏'>
+                            <Menu className='h-5 w-5' />
+                        </button>
+                        <div className='min-w-0'>
+                            <p className='flex items-center gap-2 text-xs text-white/45'>
+                                <LayoutDashboard className='h-3.5 w-3.5' aria-hidden='true' />
+                                固定侧边栏布局
+                            </p>
+                            <h1 className='truncate text-lg font-semibold text-white'>
+                                {activeSection === 'generate' ? '图片生成' : '提示词画廊'}
+                            </h1>
                         </div>
                     </div>
                 </header>
 
-                <section className='grid w-full grid-cols-1 gap-6 lg:grid-cols-[minmax(380px,440px)_minmax(0,1fr)] xl:grid-cols-[minmax(420px,480px)_minmax(0,1fr)]'>
-                    <div
-                        ref={formPanelRef}
-                        data-panel='form'
-                        className='relative flex min-h-[640px] flex-col lg:sticky lg:top-6 lg:h-[calc(100dvh-3rem)]'>
-                        {error && (
-                            <Alert variant='destructive' className='mb-4 border-red-500/50 bg-red-900/20 text-red-300'>
-                                <AlertTitle className='text-red-200'>Error</AlertTitle>
-                                <AlertDescription>{error}</AlertDescription>
-                            </Alert>
-                        )}
-                        <div className={mode === 'generate' ? 'block h-full w-full' : 'hidden'}>
-                            <GenerationForm
-                                onSubmit={handleApiCall}
-                                isLoading={isCreatingJob}
-                                currentMode={mode}
-                                onModeChange={setMode}
-                                model={genModel}
-                                setModel={setGenModel}
-                                prompt={genPrompt}
-                                setPrompt={setGenPrompt}
-                                n={genN}
-                                setN={setGenN}
-                                size={genSize}
-                                setSize={setGenSize}
-                                customWidth={genCustomWidth}
-                                setCustomWidth={setGenCustomWidth}
-                                customHeight={genCustomHeight}
-                                setCustomHeight={setGenCustomHeight}
-                                quality={genQuality}
-                                setQuality={setGenQuality}
-                                outputFormat={genOutputFormat}
-                                setOutputFormat={setGenOutputFormat}
-                                compression={genCompression}
-                                setCompression={setGenCompression}
-                                background={genBackground}
-                                setBackground={setGenBackground}
-                                moderation={genModeration}
-                                setModeration={setGenModeration}
-                                enableStreaming={enableStreaming}
-                                setEnableStreaming={setEnableStreaming}
-                                partialImages={partialImages}
-                                setPartialImages={setPartialImages}
-                            />
-                        </div>
-                        <div className={mode === 'edit' ? 'block h-full w-full' : 'hidden'}>
-                            <EditingForm
-                                onSubmit={handleApiCall}
-                                isLoading={isCreatingJob}
-                                currentMode={mode}
-                                onModeChange={setMode}
-                                editModel={editModel}
-                                setEditModel={setEditModel}
-                                imageFiles={editImageFiles}
-                                sourceImagePreviewUrls={editSourceImagePreviewUrls}
-                                setImageFiles={setEditImageFiles}
-                                setSourceImagePreviewUrls={setEditSourceImagePreviewUrls}
-                                maxImages={MAX_EDIT_IMAGES}
-                                editPrompt={editPrompt}
-                                setEditPrompt={setEditPrompt}
-                                editN={editN}
-                                setEditN={setEditN}
-                                editSize={editSize}
-                                setEditSize={setEditSize}
-                                editCustomWidth={editCustomWidth}
-                                setEditCustomWidth={setEditCustomWidth}
-                                editCustomHeight={editCustomHeight}
-                                setEditCustomHeight={setEditCustomHeight}
-                                editQuality={editQuality}
-                                setEditQuality={setEditQuality}
-                                editBrushSize={editBrushSize}
-                                setEditBrushSize={setEditBrushSize}
-                                editShowMaskEditor={editShowMaskEditor}
-                                setEditShowMaskEditor={setEditShowMaskEditor}
-                                editGeneratedMaskFile={editGeneratedMaskFile}
-                                setEditGeneratedMaskFile={setEditGeneratedMaskFile}
-                                editIsMaskSaved={editIsMaskSaved}
-                                setEditIsMaskSaved={setEditIsMaskSaved}
-                                editOriginalImageSize={editOriginalImageSize}
-                                setEditOriginalImageSize={setEditOriginalImageSize}
-                                editDrawnPoints={editDrawnPoints}
-                                setEditDrawnPoints={setEditDrawnPoints}
-                                editMaskPreviewUrl={editMaskPreviewUrl}
-                                setEditMaskPreviewUrl={setEditMaskPreviewUrl}
-                                enableStreaming={enableStreaming}
-                                setEnableStreaming={setEnableStreaming}
-                                partialImages={partialImages}
-                                setPartialImages={setPartialImages}
-                            />
-                        </div>
-                    </div>
+                <div className='px-4 py-6 md:px-6 lg:px-8'>
+                    {activeSection === 'generate' ? (
+                        <section className='grid w-full grid-cols-1 gap-6 lg:grid-cols-[minmax(380px,480px)_minmax(0,1fr)]'>
+                            <div
+                                ref={formPanelRef}
+                                data-panel='form'
+                                className='relative flex min-h-[640px] flex-col lg:sticky lg:top-22 lg:h-[calc(100dvh-7rem)]'>
+                                {error && (
+                                    <Alert
+                                        variant='destructive'
+                                        className='mb-4 border-red-500/50 bg-red-900/20 text-red-300'>
+                                        <AlertTitle className='text-red-200'>Error</AlertTitle>
+                                        <AlertDescription>{error}</AlertDescription>
+                                    </Alert>
+                                )}
+                                <div className={mode === 'generate' ? 'block h-full w-full' : 'hidden'}>
+                                    <GenerationForm
+                                        onSubmit={handleApiCall}
+                                        isLoading={isCreatingJob}
+                                        currentMode={mode}
+                                        onModeChange={setMode}
+                                        model={genModel}
+                                        setModel={setGenModel}
+                                        prompt={genPrompt}
+                                        setPrompt={setGenPrompt}
+                                        n={genN}
+                                        setN={setGenN}
+                                        size={genSize}
+                                        setSize={setGenSize}
+                                        customWidth={genCustomWidth}
+                                        setCustomWidth={setGenCustomWidth}
+                                        customHeight={genCustomHeight}
+                                        setCustomHeight={setGenCustomHeight}
+                                        quality={genQuality}
+                                        setQuality={setGenQuality}
+                                        outputFormat={genOutputFormat}
+                                        setOutputFormat={setGenOutputFormat}
+                                        compression={genCompression}
+                                        setCompression={setGenCompression}
+                                        background={genBackground}
+                                        setBackground={setGenBackground}
+                                        moderation={genModeration}
+                                        setModeration={setGenModeration}
+                                        enableStreaming={enableStreaming}
+                                        setEnableStreaming={setEnableStreaming}
+                                        partialImages={partialImages}
+                                        setPartialImages={setPartialImages}
+                                    />
+                                </div>
+                                <div className={mode === 'edit' ? 'block h-full w-full' : 'hidden'}>
+                                    <EditingForm
+                                        onSubmit={handleApiCall}
+                                        isLoading={isCreatingJob}
+                                        currentMode={mode}
+                                        onModeChange={setMode}
+                                        editModel={editModel}
+                                        setEditModel={setEditModel}
+                                        imageFiles={editImageFiles}
+                                        sourceImagePreviewUrls={editSourceImagePreviewUrls}
+                                        setImageFiles={setEditImageFiles}
+                                        setSourceImagePreviewUrls={setEditSourceImagePreviewUrls}
+                                        maxImages={MAX_EDIT_IMAGES}
+                                        editPrompt={editPrompt}
+                                        setEditPrompt={setEditPrompt}
+                                        editN={editN}
+                                        setEditN={setEditN}
+                                        editSize={editSize}
+                                        setEditSize={setEditSize}
+                                        editCustomWidth={editCustomWidth}
+                                        setEditCustomWidth={setEditCustomWidth}
+                                        editCustomHeight={editCustomHeight}
+                                        setEditCustomHeight={setEditCustomHeight}
+                                        editQuality={editQuality}
+                                        setEditQuality={setEditQuality}
+                                        editBrushSize={editBrushSize}
+                                        setEditBrushSize={setEditBrushSize}
+                                        editShowMaskEditor={editShowMaskEditor}
+                                        setEditShowMaskEditor={setEditShowMaskEditor}
+                                        editGeneratedMaskFile={editGeneratedMaskFile}
+                                        setEditGeneratedMaskFile={setEditGeneratedMaskFile}
+                                        editIsMaskSaved={editIsMaskSaved}
+                                        setEditIsMaskSaved={setEditIsMaskSaved}
+                                        editOriginalImageSize={editOriginalImageSize}
+                                        setEditOriginalImageSize={setEditOriginalImageSize}
+                                        editDrawnPoints={editDrawnPoints}
+                                        setEditDrawnPoints={setEditDrawnPoints}
+                                        editMaskPreviewUrl={editMaskPreviewUrl}
+                                        setEditMaskPreviewUrl={setEditMaskPreviewUrl}
+                                        enableStreaming={enableStreaming}
+                                        setEnableStreaming={setEnableStreaming}
+                                        partialImages={partialImages}
+                                        setPartialImages={setPartialImages}
+                                    />
+                                </div>
+                            </div>
 
-                    <div data-panel='task-queue' className='min-h-[640px] lg:h-[calc(100dvh-3rem)]'>
-                        <TaskQueuePanel jobs={jobs} onClearQueue={handleClearQueue} />
-                    </div>
-                </section>
-
-                <div className='w-full'>
-                    <PromptTemplateGallery
-                        templates={promptTemplates}
-                        scenes={promptTemplateScenes}
-                        onImportPrompt={handleImportPromptTemplate}
-                    />
+                            <div data-panel='task-queue' className='min-h-[640px] lg:h-[calc(100dvh-7rem)]'>
+                                <TaskQueuePanel jobs={jobs} onClearQueue={handleClearQueue} />
+                            </div>
+                        </section>
+                    ) : (
+                        <PromptTemplateGallery
+                            templates={promptTemplates}
+                            scenes={promptTemplateScenes}
+                            onImportPrompt={handleImportPromptTemplate}
+                        />
+                    )}
                 </div>
             </div>
         </main>

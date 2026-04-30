@@ -61,6 +61,17 @@ test('playground places task queue on the right and image viewer supports zoom',
   assert.match(taskQueue, /max-w-\[96vw\]/);
 });
 
+test('playground uses a fixed sidebar with image generation and prompt gallery views', () => {
+  const playground = read('src/app/playground-client.tsx');
+
+  assert.match(playground, /activeSection/);
+  assert.match(playground, /fixed.*w-64|w-64.*fixed/);
+  assert.match(playground, /图片生成/);
+  assert.match(playground, /提示词画廊/);
+  assert.match(playground, /setActiveSection\('generate'\)/);
+  assert.match(playground, /setGenPrompt\(prompt\)/);
+});
+
 test('task queue shows an R2 badge for R2-backed image jobs', () => {
   const taskQueue = read('src/components/task-queue-panel.tsx');
 
