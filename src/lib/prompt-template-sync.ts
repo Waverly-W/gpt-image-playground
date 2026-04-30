@@ -3,7 +3,7 @@ import { lookup } from 'mime-types';
 import { putR2Image, r2ObjectExists } from '@/lib/image-storage';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-template-data';
 import { getPromptTemplateObjectKey, resolvePromptTemplateImagePath } from '@/lib/prompt-templates';
-import type { RuntimeConfig } from '@/lib/settings';
+import { getSetting, setSetting, type RuntimeConfig } from '@/lib/settings';
 
 export type PromptTemplateUpload = {
     filename: string;
@@ -31,6 +31,7 @@ export type PromptTemplateSyncStatus = {
     error: string | null;
     startedAt: string | null;
     finishedAt: string | null;
+    updatedAt: string | null;
 };
 
 type SyncDeps = {
@@ -42,17 +43,102 @@ type SyncDeps = {
     onProgress?: (event: PromptTemplateSyncProgress) => void | Promise<void>;
 };
 
-let currentSyncStatus: PromptTemplateSyncStatus = {
-    status: 'idle',
-    completed: 0,
-    total: 0,
-    uploaded: 0,
-    skipped: 0,
-    currentFilename: null,
-    error: null,
-    startedAt: null,
-    finishedAt: null
-};
+const PROMPT_TEMPLATE_SYNC_STATUS_KEY = 'prompt_template_sync_status';
+const DEFAULT_OPERATION_TIMEOUT_MS = 20_000;
+const DEFAULT_OPERATION_RETRIES = 3;
+
+function createIdleStatus(): PromptTemplateSyncStatus {
+    return {
+        status: 'idle',
+        completed: 0,
+        total: 0,
+        uploaded: 0,
+        skipped: 0,
+        currentFilename: null,
+        error: null,
+        startedAt: null,
+        finishedAt: null,
+        updatedAt: null
+    };
+}
+
+function loadStoredSyncStatus(): PromptTemplateSyncStatus {
+    const raw = getSetting(PROMPT_TEMPLATE_SYNC_STATUS_KEY);
+    if (!raw) {
+        return createIdleStatus();
+    }
+
+    try {
+        const parsed = JSON.parse(raw) as Partial<PromptTemplateSyncStatus>;
+        return {
+            ...createIdleStatus(),
+            ...parsed
+        };
+    } catch {
+        return createIdleStatus();
+    }
+}
+
+function persistSyncStatus(status: PromptTemplateSyncStatus) {
+    setSetting(PROMPT_TEMPLATE_SYNC_STATUS_KEY, JSON.stringify(status));
+}
+
+let currentSyncStatus: PromptTemplateSyncStatus = loadStoredSyncStatus();
+let activeSyncPromise: Promise<void> | null = null;
+
+if (currentSyncStatus.status === 'running') {
+    currentSyncStatus = {
+        ...currentSyncStatus,
+        status: 'failed',
+        error: currentSyncStatus.error || '同步任务在服务重启后中断，请重新开始。',
+        finishedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+    persistSyncStatus(currentSyncStatus);
+}
+
+function updateSyncStatus(patch: Partial<PromptTemplateSyncStatus>) {
+    currentSyncStatus = {
+        ...currentSyncStatus,
+        ...patch,
+        updatedAt: new Date().toISOString()
+    };
+    persistSyncStatus(currentSyncStatus);
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    try {
+        return await Promise.race([
+            promise,
+            new Promise<T>((_, reject) => {
+                timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+            })
+        ]);
+    } finally {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+    }
+}
+
+async function withRetry<T>(operation: () => Promise<T>, label: string): Promise<T> {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= DEFAULT_OPERATION_RETRIES; attempt++) {
+        try {
+            return await withTimeout(operation(), DEFAULT_OPERATION_TIMEOUT_MS, `${label} attempt ${attempt}`);
+        } catch (error) {
+            lastError = error;
+            if (attempt === DEFAULT_OPERATION_RETRIES) {
+                break;
+            }
+        }
+    }
+
+    throw lastError;
+}
 
 export function listPromptTemplateUploads(): PromptTemplateUpload[] {
     return PROMPT_TEMPLATES.map((template) => {
@@ -88,7 +174,7 @@ export async function syncPromptTemplateImagesToR2(
     for (const [index, upload] of uploads.entries()) {
         await deps.onCurrentFile?.(upload.filename);
 
-        if (await objectExists(upload.key, runtimeConfig)) {
+        if (await withRetry(() => objectExists(upload.key, runtimeConfig), `Check ${upload.filename}`)) {
             skipped += 1;
             await deps.onProgress?.({
                 completed: index + 1,
@@ -102,7 +188,10 @@ export async function syncPromptTemplateImagesToR2(
         }
 
         const buffer = await readFile(upload.filePath);
-        await uploadObject(upload.key, buffer, upload.contentType, runtimeConfig);
+        await withRetry(
+            () => uploadObject(upload.key, buffer, upload.contentType, runtimeConfig),
+            `Upload ${upload.filename}`
+        );
         uploaded += 1;
         await deps.onProgress?.({
             completed: index + 1,
@@ -118,7 +207,7 @@ export async function syncPromptTemplateImagesToR2(
 }
 
 export function startPromptTemplateSync(runtimeConfig: RuntimeConfig): PromptTemplateSyncStatus {
-    if (currentSyncStatus.status === 'running') {
+    if (activeSyncPromise) {
         return currentSyncStatus;
     }
 
@@ -132,49 +221,49 @@ export function startPromptTemplateSync(runtimeConfig: RuntimeConfig): PromptTem
         currentFilename: uploads[0]?.filename ?? null,
         error: null,
         startedAt: new Date().toISOString(),
-        finishedAt: null
+        finishedAt: null,
+        updatedAt: new Date().toISOString()
     };
+    persistSyncStatus(currentSyncStatus);
 
-    void syncPromptTemplateImagesToR2(runtimeConfig, {
+    activeSyncPromise = syncPromptTemplateImagesToR2(runtimeConfig, {
         uploads,
         onCurrentFile: (filename) => {
-            currentSyncStatus = {
-                ...currentSyncStatus,
-                currentFilename: filename
-            };
+            updateSyncStatus({ currentFilename: filename });
         },
         onProgress: ({ completed, total, filename, uploaded, skipped }) => {
-            currentSyncStatus = {
-                ...currentSyncStatus,
+            updateSyncStatus({
                 status: 'running',
                 completed,
                 total,
                 uploaded,
                 skipped,
                 currentFilename: filename
-            };
+            });
         }
     })
         .then(({ uploaded, skipped }) => {
-            currentSyncStatus = {
-                ...currentSyncStatus,
+            updateSyncStatus({
                 status: 'completed',
                 completed: uploaded + skipped,
                 total: uploads.length,
                 uploaded,
                 skipped,
                 currentFilename: null,
-                finishedAt: new Date().toISOString()
-            };
+                finishedAt: new Date().toISOString(),
+                error: null
+            });
         })
         .catch((error: unknown) => {
-            currentSyncStatus = {
-                ...currentSyncStatus,
+            updateSyncStatus({
                 status: 'failed',
                 error: error instanceof Error ? error.message : 'Prompt template sync failed.',
                 currentFilename: null,
                 finishedAt: new Date().toISOString()
-            };
+            });
+        })
+        .finally(() => {
+            activeSyncPromise = null;
         });
 
     return currentSyncStatus;

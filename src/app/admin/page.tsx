@@ -125,10 +125,16 @@ export default function AdminPage() {
     const load = React.useCallback(async () => {
         try {
             setError(null);
-            const [usersData, settingsData] = await Promise.all([api('/api/admin/users'), api('/api/admin/settings')]);
+            const [usersData, settingsData, syncStatusData] = await Promise.all([
+                api('/api/admin/users'),
+                api('/api/admin/settings'),
+                api('/api/admin/prompt-template-images/sync')
+            ]);
             setUsers(usersData.users || []);
             setRegistrationEnabled(Boolean(settingsData.registrationEnabled));
             setRuntimeSettings({ ...emptyRuntimeSettings, ...settingsData });
+            setPromptTemplateSyncStatus(syncStatusData);
+            setIsSyncingPromptTemplates(syncStatusData.status === 'running');
         } catch (err) {
             setError(err instanceof Error ? err.message : '加载失败');
         }
