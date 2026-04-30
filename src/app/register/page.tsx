@@ -1,13 +1,24 @@
 'use client';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import React from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import React from 'react';
+
+const registrationErrorLabels: Record<string, string> = {
+    'Registration is disabled.': '注册已关闭。',
+    'Email and password are required.': '请输入邮箱和密码。',
+    'Registration failed.': '注册失败。'
+};
+
+const localizeRegistrationError = (message: string | undefined) => {
+    if (!message) return '注册失败。';
+    return registrationErrorLabels[message] ?? message;
+};
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -37,11 +48,11 @@ export default function RegisterPage() {
                 body: JSON.stringify({ email, password, name })
             });
             const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Registration failed.');
+            if (!response.ok) throw new Error(localizeRegistrationError(data.error));
             setSuccess('注册成功，请登录。');
             setTimeout(() => router.push('/login'), 700);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Registration failed.');
+            setError(err instanceof Error ? localizeRegistrationError(err.message) : '注册失败。');
         } finally {
             setLoading(false);
         }
@@ -110,7 +121,10 @@ export default function RegisterPage() {
                                 className='border-white/20 bg-black text-white'
                             />
                         </div>
-                        <Button type='submit' disabled={loading} className='w-full bg-white text-black hover:bg-white/90'>
+                        <Button
+                            type='submit'
+                            disabled={loading}
+                            className='w-full bg-white text-black hover:bg-white/90'>
                             {loading ? '注册中...' : '注册'}
                         </Button>
                         <p className='text-center text-sm text-white/60'>

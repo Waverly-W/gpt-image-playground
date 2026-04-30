@@ -1,12 +1,24 @@
 'use client';
 
-import Link from 'next/link';
-import React from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import Link from 'next/link';
+import React from 'react';
+
+const authErrorLabels: Record<string, string> = {
+    'Email and password are required.': '请输入邮箱和密码。',
+    'Invalid email or password.': '邮箱或密码无效。',
+    'Authentication is not configured on the server.': '服务器未配置认证。',
+    'Login failed.': '登录失败。'
+};
+
+const localizeAuthError = (message: string | undefined) => {
+    if (!message) return '登录失败。';
+    return authErrorLabels[message] ?? message;
+};
 
 export default function LoginPage() {
     const [email, setEmail] = React.useState('');
@@ -32,12 +44,12 @@ export default function LoginPage() {
             } catch {
                 data = {};
             }
-            if (!response.ok) throw new Error(data.error || 'Login failed.');
+            if (!response.ok) throw new Error(localizeAuthError(data.error));
 
             const targetPath = data.user?.role === 'admin' ? '/admin' : '/';
             window.location.assign(targetPath);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Login failed.');
+            setError(err instanceof Error ? localizeAuthError(err.message) : '登录失败。');
         } finally {
             setLoading(false);
         }
@@ -79,7 +91,10 @@ export default function LoginPage() {
                                 className='border-white/20 bg-black text-white'
                             />
                         </div>
-                        <Button type='submit' disabled={loading} className='w-full bg-white text-black hover:bg-white/90'>
+                        <Button
+                            type='submit'
+                            disabled={loading}
+                            className='w-full bg-white text-black hover:bg-white/90'>
                             {loading ? '登录中...' : '登录'}
                         </Button>
                         <p className='text-center text-sm text-white/60'>

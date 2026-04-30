@@ -225,7 +225,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
             }
 
             if (editImageFiles.length >= MAX_EDIT_IMAGES) {
-                alert(`Cannot paste: Maximum of ${MAX_EDIT_IMAGES} images reached.`);
+                alert(`无法粘贴：最多支持 ${MAX_EDIT_IMAGES} 张图片。`);
                 return;
             }
 
@@ -384,7 +384,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                             setError(null);
                         } else if (job.status === 'failed') {
                             settledIds.add(job.id);
-                            setError(job.error || 'Image generation failed.');
+                            setError(job.error || '图片生成失败。');
                         }
                     })
                 );
@@ -473,7 +473,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                 const result = (await response.json()) as { job?: ImageJobDto; error?: string };
 
                 if (!response.ok || !result.job) {
-                    throw new Error(result.error || `Job request failed with status ${response.status}`);
+                    throw new Error(result.error || `任务请求失败，状态码 ${response.status}`);
                 }
 
                 setActiveJobIds((prev) => (prev.includes(result.job!.id) ? prev : [result.job!.id, ...prev]));
@@ -489,7 +489,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
             const contentType = response.headers.get('content-type');
             if (contentType?.includes('text/event-stream')) {
                 if (!response.body) {
-                    throw new Error('Response body is null');
+                    throw new Error('响应内容为空。');
                 }
 
                 const reader = response.body.getReader();
@@ -522,7 +522,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                                         return newMap;
                                     });
                                 } else if (event.type === 'error') {
-                                    throw new Error(event.error || 'Streaming error occurred');
+                                    throw new Error(event.error || '流式生成出错。');
                                 } else if (event.type === 'done') {
                                     // Finalize with all completed images
                                     durationMs = Date.now() - startTime;
@@ -610,9 +610,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                                                                 `Error saving blob ${img.filename} to IndexedDB:`,
                                                                 dbError
                                                             );
-                                                            setError(
-                                                                `Failed to save image ${img.filename} to local database.`
-                                                            );
+                                                            setError(`无法将图片 ${img.filename} 保存到本地数据库。`);
                                                             return null;
                                                         }
                                                     } else {
@@ -660,7 +658,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
             const result = await response.json();
 
             if (!response.ok) {
-                throw new Error(result.error || `API request failed with status ${response.status}`);
+                throw new Error(result.error || `API 请求失败，状态码 ${response.status}`);
             }
 
             if (result.images && result.images.length > 0) {
@@ -732,7 +730,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                                 return { filename: img.filename, path: blobUrl, storageMode: responseStorageMode };
                             } catch (dbError) {
                                 console.error(`Error saving blob ${img.filename} to IndexedDB:`, dbError);
-                                setError(`Failed to save image ${img.filename} to local database.`);
+                                setError(`无法将图片 ${img.filename} 保存到本地数据库。`);
                                 return null;
                             }
                         } else {
@@ -760,12 +758,12 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                 setHistory((prevHistory) => [newHistoryEntry, ...prevHistory]);
             } else {
                 setLatestImageBatch(null);
-                throw new Error('API response did not contain valid image data or filenames.');
+                throw new Error('API 响应未包含有效的图片数据或文件名。');
             }
         } catch (err: unknown) {
             durationMs = Date.now() - startTime;
             console.error(`API Call Error after ${durationMs}ms:`, err);
-            const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
+            const errorMessage = err instanceof Error ? err.message : '发生未知错误。';
             setError(errorMessage);
             setLatestImageBatch(null);
             setStreamingPreviewImages(new Map());
@@ -793,7 +791,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                     console.warn(
                         `Could not get image source for history item: ${imgInfo.filename} (mode: ${originalStorageMode})`
                     );
-                    setError(`Image ${imgInfo.filename} could not be loaded.`);
+                    setError(`图片 ${imgInfo.filename} 无法加载。`);
                     return null;
                 }
             });
@@ -802,9 +800,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                 const validImages = resolvedBatch.filter(Boolean) as DisplayImage[];
 
                 if (validImages.length !== item.images.length) {
-                    setError(
-                        'Some images from this history entry could not be loaded (they might have been cleared or are missing).'
-                    );
+                    setError('该历史记录中的部分图片无法加载，可能已被清除或丢失。');
                 } else {
                     setError(null);
                 }
@@ -819,8 +815,8 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
     const handleClearHistory = React.useCallback(async () => {
         const confirmationMessage =
             effectiveStorageModeClient === 'indexeddb'
-                ? 'Are you sure you want to clear the entire image history? In IndexedDB mode, this will also permanently delete all stored images. This cannot be undone.'
-                : 'Are you sure you want to clear the entire image history? This cannot be undone.';
+                ? '确定要清空全部图片历史吗？在 IndexedDB 模式下，这也会永久删除所有已存储图片。此操作无法撤销。'
+                : '确定要清空全部图片历史吗？此操作无法撤销。';
 
         if (window.confirm(confirmationMessage)) {
             setHistory([]);
@@ -840,7 +836,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                 }
             } catch (e) {
                 console.error('Failed during history clearing:', e);
-                setError(`Failed to clear history: ${e instanceof Error ? e.message : String(e)}`);
+                setError(`清空历史失败：${e instanceof Error ? e.message : String(e)}`);
             }
         }
     }, []);
@@ -857,7 +853,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
         }
 
         if (mode === 'edit' && editImageFiles.length >= MAX_EDIT_IMAGES) {
-            setError(`Cannot add more than ${MAX_EDIT_IMAGES} images to the edit form.`);
+            setError(`编辑表单最多只能添加 ${MAX_EDIT_IMAGES} 张图片。`);
             setIsSendingToEdit(false);
             return;
         }
@@ -876,19 +872,19 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                     blob = record.blob;
                     mimeType = blob.type || mimeType;
                 } else {
-                    throw new Error(`Image ${filename} not found in local database.`);
+                    throw new Error(`本地数据库中找不到图片 ${filename}。`);
                 }
             } else {
                 const response = await fetch(`/api/image/${filename}`);
                 if (!response.ok) {
-                    throw new Error(`Failed to fetch image: ${response.statusText}`);
+                    throw new Error(`获取图片失败：${response.statusText}`);
                 }
                 blob = await response.blob();
                 mimeType = response.headers.get('Content-Type') || mimeType;
             }
 
             if (!blob) {
-                throw new Error(`Could not retrieve image data for ${filename}.`);
+                throw new Error(`无法获取图片 ${filename} 的数据。`);
             }
 
             const newFile = new File([blob], filename, { type: mimeType });
@@ -904,7 +900,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
             }
         } catch (err: unknown) {
             console.error('Error sending image to edit:', err);
-            const errorMessage = err instanceof Error ? err.message : 'Failed to send image to edit form.';
+            const errorMessage = err instanceof Error ? err.message : '无法将图片发送到编辑表单。';
             setError(errorMessage);
         } finally {
             setIsSendingToEdit(false);
@@ -939,7 +935,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
 
                 const result = await response.json();
                 if (!response.ok) {
-                    throw new Error(result.error || `API deletion failed with status ${response.status}`);
+                    throw new Error(result.error || `API 删除失败，状态码 ${response.status}`);
                 }
             }
 
@@ -949,7 +945,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
             );
         } catch (e: unknown) {
             console.error('Error during item deletion:', e);
-            setError(e instanceof Error ? e.message : 'An unexpected error occurred during deletion.');
+            setError(e instanceof Error ? e.message : '删除过程中发生未知错误。');
         } finally {
             setItemToDeleteConfirm(null);
         }
