@@ -32,9 +32,16 @@ test('r2 config can be resolved from unsaved runtime settings', async () => {
 
 test('admin runtime settings include an r2 connection test action', () => {
     const adminPageSource = readFileSync(new URL('../src/app/admin/page.tsx', import.meta.url), 'utf8');
+    const syncRouteSource = readFileSync(
+        new URL('../src/app/api/admin/prompt-template-images/sync/route.ts', import.meta.url),
+        'utf8'
+    );
 
     assert.match(adminPageSource, /测试 R2 连接/);
     assert.match(adminPageSource, /上传模板图片到 R2/);
+    assert.match(adminPageSource, /已上传 .* \/ .* 张/);
     assert.match(adminPageSource, /R2 Public Base URL/);
     assert.match(adminPageSource, /\/api\/admin\/settings\/r2-test/);
+    assert.match(syncRouteSource, /export async function GET/);
+    assert.match(syncRouteSource, /export async function POST/);
 });

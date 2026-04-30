@@ -100,8 +100,13 @@ export async function testR2Connection(runtimeConfig: RuntimeConfig): Promise<vo
     );
 }
 
-export async function putR2Image(filename: string, body: Buffer, contentType?: string): Promise<void> {
-    const config = getR2Config();
+export async function putR2Image(
+    filename: string,
+    body: Buffer,
+    contentType?: string,
+    runtimeConfig?: RuntimeConfig
+): Promise<void> {
+    const config = runtimeConfig ? getR2ConfigFromRuntimeConfig(runtimeConfig) : getR2Config();
     await createR2Client(config).send(
         new PutObjectCommand({
             Bucket: config.bucket,

@@ -35,6 +35,16 @@ type RuntimeSettings = {
     registrationEnabled: boolean;
 };
 
+type PromptTemplateSyncStatus = {
+    status: 'idle' | 'running' | 'completed' | 'failed';
+    completed: number;
+    total: number;
+    currentFilename: string | null;
+    error: string | null;
+    startedAt: string | null;
+    finishedAt: string | null;
+};
+
 const emptyRuntimeSettings: RuntimeSettings = {
     openaiApiKey: '',
     openaiBaseUrl: '',
@@ -69,6 +79,7 @@ export default function AdminPage() {
     const [isSavingSettings, setIsSavingSettings] = React.useState(false);
     const [isTestingR2, setIsTestingR2] = React.useState(false);
     const [isSyncingPromptTemplates, setIsSyncingPromptTemplates] = React.useState(false);
+    const [promptTemplateSyncStatus, setPromptTemplateSyncStatus] = React.useState<PromptTemplateSyncStatus | null>(null);
     const [error, setError] = React.useState<string | null>(null);
     const [message, setMessage] = React.useState<string | null>(null);
     const [newEmail, setNewEmail] = React.useState('');
@@ -124,6 +135,37 @@ export default function AdminPage() {
     React.useEffect(() => {
         load();
     }, [load]);
+
+    React.useEffect(() => {
+        if (!isSyncingPromptTemplates) {
+            return;
+        }
+
+        const poll = async () => {
+            try {
+                const data = await api('/api/admin/prompt-template-images/sync');
+                setPromptTemplateSyncStatus(data);
+
+                if (data.status === 'completed') {
+                    setIsSyncingPromptTemplates(false);
+                    setMessage(`模板图片已上传到 R2，共 ${data.completed ?? 0} 张。`);
+                } else if (data.status === 'failed') {
+                    setIsSyncingPromptTemplates(false);
+                    setError(data.error || '上传模板图片失败');
+                }
+            } catch (err) {
+                setIsSyncingPromptTemplates(false);
+                setError(err instanceof Error ? err.message : '读取上传进度失败');
+            }
+        };
+
+        void poll();
+        const timer = window.setInterval(() => {
+            void poll();
+        }, 1000);
+
+        return () => window.clearInterval(timer);
+    }, [isSyncingPromptTemplates]);
 
     const createUser = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -229,12 +271,15 @@ export default function AdminPage() {
         try {
             setIsSyncingPromptTemplates(true);
             setError(null);
-            const data = await api('/api/admin/prompt-template-images/sync', { method: 'POST' });
-            setMessage(`模板图片已上传到 R2，共 ${data.uploaded ?? 0} 张。`);
+            setMessage(null);
+            const data = await api('/api/admin/prompt-template-images/sync', {
+                method: 'POST',
+                body: JSON.stringify(runtimeSettings)
+            });
+            setPromptTemplateSyncStatus(data);
         } catch (err) {
-            setError(err instanceof Error ? err.message : '上传模板图片失败');
-        } finally {
             setIsSyncingPromptTemplates(false);
+            setError(err instanceof Error ? err.message : '上传模板图片失败');
         }
     };
 
@@ -439,6 +484,24 @@ export default function AdminPage() {
                                             {isSavingSettings ? '保存中...' : '保存运行配置'}
                                         </Button>
                                     </div>
+                                    {promptTemplateSyncStatus && (
+                                        <div className='rounded-xl border border-white/10 bg-black/30 p-4 text-sm text-white/70'>
+                                            <div className='flex items-center justify-between gap-3'>
+                                                <span>模板图片上传进度</span>
+                                                <span>
+                                                    已上传 {promptTemplateSyncStatus.completed} / {promptTemplateSyncStatus.total} 张
+                                                </span>
+                                            </div>
+                                            {promptTemplateSyncStatus.currentFilename && (
+                                                <p className='mt-2 truncate text-white/50'>
+                                                    当前文件：{promptTemplateSyncStatus.currentFilename}
+                                                </p>
+                                            )}
+                                            {promptTemplateSyncStatus.error && (
+                                                <p className='mt-2 text-red-300'>{promptTemplateSyncStatus.error}</p>
+                                            )}
+                                        </div>
+                                    )}
                                 </form>
                             </CardContent>
                         </Card>
