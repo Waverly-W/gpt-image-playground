@@ -2,10 +2,12 @@
 
 import { EditingForm, type EditingFormData } from '@/components/editing-form';
 import { GenerationForm, type GenerationFormData } from '@/components/generation-form';
+import { PromptTemplateGallery } from '@/components/prompt-template-gallery';
 import { TaskQueuePanel, type QueueImageJob } from '@/components/task-queue-panel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { type SessionUser } from '@/lib/auth';
 import type { CostDetails, GptImageModel } from '@/lib/cost-utils';
+import { PROMPT_TEMPLATE_SCENES, PROMPT_TEMPLATES } from '@/lib/prompt-template-data';
 import { getPresetDimensions } from '@/lib/size-utils';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -44,6 +46,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
     const [isCreatingJob, setIsCreatingJob] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [jobs, setJobs] = React.useState<QueueImageJob[]>([]);
+    const formPanelRef = React.useRef<HTMLDivElement>(null);
 
     const router = useRouter();
     const handleLogout = async () => {
@@ -234,6 +237,12 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
         }
     }, []);
 
+    const handleImportPromptTemplate = React.useCallback((prompt: string) => {
+        setMode('generate');
+        setGenPrompt(prompt);
+        formPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, []);
+
     return (
         <main className='flex min-h-screen flex-col items-center bg-black p-4 text-white md:p-8 lg:p-12'>
             <div className='mb-4 flex w-full max-w-screen-2xl items-center justify-between text-sm text-white/70'>
@@ -252,7 +261,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                 </div>
             </div>
             <div className='grid w-full max-w-screen-2xl grid-cols-1 gap-6 lg:grid-cols-[minmax(420px,0.95fr)_minmax(520px,1.05fr)]'>
-                <div data-panel='form' className='relative flex h-[78vh] min-h-[620px] flex-col'>
+                <div ref={formPanelRef} data-panel='form' className='relative flex h-[78vh] min-h-[620px] flex-col'>
                     {error && (
                         <Alert variant='destructive' className='mb-4 border-red-500/50 bg-red-900/20 text-red-300'>
                             <AlertTitle className='text-red-200'>Error</AlertTitle>
@@ -343,6 +352,13 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                 <div data-panel='task-queue' className='h-[78vh] min-h-[620px]'>
                     <TaskQueuePanel jobs={jobs} onClearQueue={handleClearQueue} />
                 </div>
+            </div>
+            <div className='mt-8 w-full'>
+                <PromptTemplateGallery
+                    templates={PROMPT_TEMPLATES}
+                    scenes={PROMPT_TEMPLATE_SCENES}
+                    onImportPrompt={handleImportPromptTemplate}
+                />
             </div>
         </main>
     );
