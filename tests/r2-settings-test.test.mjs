@@ -39,7 +39,7 @@ test('admin runtime settings include an r2 connection test action', () => {
 
     assert.match(adminPageSource, /测试 R2 连接/);
     assert.match(adminPageSource, /上传模板图片到 R2/);
-    assert.match(adminPageSource, /已上传 .* \/ .* 张/);
+    assert.match(adminPageSource, /已处理 .* \/ .* 张/);
     assert.match(adminPageSource, /R2 Public Base URL/);
     assert.match(adminPageSource, /\/api\/admin\/settings\/r2-test/);
     assert.match(syncRouteSource, /export async function GET/);

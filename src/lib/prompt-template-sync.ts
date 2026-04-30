@@ -38,6 +38,7 @@ type SyncDeps = {
     readFile?: (filePath: string) => Promise<Buffer>;
     objectExists?: (key: string, runtimeConfig: RuntimeConfig) => Promise<boolean>;
     uploadObject?: (key: string, buffer: Buffer, contentType: string, runtimeConfig: RuntimeConfig) => Promise<void>;
+    onCurrentFile?: (filename: string) => void | Promise<void>;
     onProgress?: (event: PromptTemplateSyncProgress) => void | Promise<void>;
 };
 
@@ -85,6 +86,8 @@ export async function syncPromptTemplateImagesToR2(
     let skipped = 0;
 
     for (const [index, upload] of uploads.entries()) {
+        await deps.onCurrentFile?.(upload.filename);
+
         if (await objectExists(upload.key, runtimeConfig)) {
             skipped += 1;
             await deps.onProgress?.({
@@ -134,6 +137,12 @@ export function startPromptTemplateSync(runtimeConfig: RuntimeConfig): PromptTem
 
     void syncPromptTemplateImagesToR2(runtimeConfig, {
         uploads,
+        onCurrentFile: (filename) => {
+            currentSyncStatus = {
+                ...currentSyncStatus,
+                currentFilename: filename
+            };
+        },
         onProgress: ({ completed, total, filename, uploaded, skipped }) => {
             currentSyncStatus = {
                 ...currentSyncStatus,

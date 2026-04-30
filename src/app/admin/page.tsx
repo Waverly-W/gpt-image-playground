@@ -493,7 +493,7 @@ export default function AdminPage() {
                                             <div className='flex items-center justify-between gap-3'>
                                                 <span>模板图片上传进度</span>
                                                 <span>
-                                                    已上传 {promptTemplateSyncStatus.completed} / {promptTemplateSyncStatus.total} 张
+                                                    已处理 {promptTemplateSyncStatus.completed} / {promptTemplateSyncStatus.total} 张
                                                 </span>
                                             </div>
                                             <p className='mt-2 text-white/50'>
