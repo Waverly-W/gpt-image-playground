@@ -252,11 +252,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                 </div>
             </div>
             <div className='grid w-full max-w-screen-2xl grid-cols-1 gap-6 lg:grid-cols-[minmax(420px,0.95fr)_minmax(520px,1.05fr)]'>
-                <div className='h-[78vh] min-h-[620px]'>
-                    <TaskQueuePanel jobs={jobs} onClearQueue={handleClearQueue} />
-                </div>
-
-                <div className='relative flex h-[78vh] min-h-[620px] flex-col'>
+                <div data-panel='form' className='relative flex h-[78vh] min-h-[620px] flex-col'>
                     {error && (
                         <Alert variant='destructive' className='mb-4 border-red-500/50 bg-red-900/20 text-red-300'>
                             <AlertTitle className='text-red-200'>Error</AlertTitle>
@@ -342,6 +338,10 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                             setPartialImages={setPartialImages}
                         />
                     </div>
+                </div>
+
+                <div data-panel='task-queue' className='h-[78vh] min-h-[620px]'>
+                    <TaskQueuePanel jobs={jobs} onClearQueue={handleClearQueue} />
                 </div>
             </div>
         </main>
