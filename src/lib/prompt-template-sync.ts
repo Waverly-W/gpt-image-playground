@@ -26,6 +26,7 @@ export type PromptTemplateSyncStatus = {
     completed: number;
     total: number;
     uploaded: number;
+    existing: number;
     skipped: number;
     currentFilename: string | null;
     error: string | null;
@@ -40,6 +41,7 @@ type SyncDeps = {
     objectExists?: (key: string, runtimeConfig: RuntimeConfig) => Promise<boolean>;
     uploadObject?: (key: string, buffer: Buffer, contentType: string, runtimeConfig: RuntimeConfig) => Promise<void>;
     onCurrentFile?: (filename: string) => void | Promise<void>;
+    onScanProgress?: (event: { existing: number; skipped: number; total: number }) => void | Promise<void>;
     onProgress?: (event: PromptTemplateSyncProgress) => void | Promise<void>;
 };
 
@@ -53,6 +55,7 @@ function createIdleStatus(): PromptTemplateSyncStatus {
         completed: 0,
         total: 0,
         uploaded: 0,
+        existing: 0,
         skipped: 0,
         currentFilename: null,
         error: null,
@@ -163,45 +166,39 @@ export function getPromptTemplateSyncStatus(): PromptTemplateSyncStatus {
 export async function syncPromptTemplateImagesToR2(
     runtimeConfig: RuntimeConfig,
     deps: SyncDeps = {}
-): Promise<{ uploaded: number; skipped: number }> {
+): Promise<{ uploaded: number; existing: number; skipped: number; total: number }> {
     const uploads = deps.uploads ?? listPromptTemplateUploads();
     const readFile = deps.readFile ?? fs.readFile;
     const objectExists = deps.objectExists ?? r2ObjectExists;
     const uploadObject = deps.uploadObject ?? putR2Image;
+    const pendingUploads: PromptTemplateUpload[] = [];
     let uploaded = 0;
+    let existing = 0;
     let skipped = 0;
 
-    for (const [index, upload] of uploads.entries()) {
+    for (const upload of uploads) {
         await deps.onCurrentFile?.(upload.filename);
 
-        let exists = false;
         try {
-            exists = await withRetry(() => objectExists(upload.key, runtimeConfig), `Check ${upload.filename}`);
+            if (await withRetry(() => objectExists(upload.key, runtimeConfig), `Check ${upload.filename}`)) {
+                existing += 1;
+                await deps.onScanProgress?.({ existing, skipped, total: uploads.length });
+                continue;
+            }
         } catch {
             skipped += 1;
-            await deps.onProgress?.({
-                completed: index + 1,
-                total: uploads.length,
-                filename: upload.filename,
-                uploaded,
-                skipped,
-                action: 'skipped'
-            });
+            await deps.onScanProgress?.({ existing, skipped, total: uploads.length });
             continue;
         }
 
-        if (exists) {
-            skipped += 1;
-            await deps.onProgress?.({
-                completed: index + 1,
-                total: uploads.length,
-                filename: upload.filename,
-                uploaded,
-                skipped,
-                action: 'skipped'
-            });
-            continue;
-        }
+        pendingUploads.push(upload);
+        await deps.onScanProgress?.({ existing, skipped, total: uploads.length });
+    }
+
+    const total = pendingUploads.length;
+
+    for (const [index, upload] of pendingUploads.entries()) {
+        await deps.onCurrentFile?.(upload.filename);
 
         const buffer = await readFile(upload.filePath);
         await withRetry(
@@ -211,7 +208,7 @@ export async function syncPromptTemplateImagesToR2(
         uploaded += 1;
         await deps.onProgress?.({
             completed: index + 1,
-            total: uploads.length,
+            total,
             filename: upload.filename,
             uploaded,
             skipped,
@@ -219,7 +216,7 @@ export async function syncPromptTemplateImagesToR2(
         });
     }
 
-    return { uploaded, skipped };
+    return { uploaded, existing, skipped, total };
 }
 
 export function startPromptTemplateSync(runtimeConfig: RuntimeConfig): PromptTemplateSyncStatus {
@@ -231,8 +228,9 @@ export function startPromptTemplateSync(runtimeConfig: RuntimeConfig): PromptTem
     currentSyncStatus = {
         status: 'running',
         completed: 0,
-        total: uploads.length,
+        total: 0,
         uploaded: 0,
+        existing: 0,
         skipped: 0,
         currentFilename: uploads[0]?.filename ?? null,
         error: null,
@@ -247,6 +245,12 @@ export function startPromptTemplateSync(runtimeConfig: RuntimeConfig): PromptTem
         onCurrentFile: (filename) => {
             updateSyncStatus({ currentFilename: filename });
         },
+        onScanProgress: ({ existing, skipped }) => {
+            updateSyncStatus({
+                existing,
+                skipped
+            });
+        },
         onProgress: ({ completed, total, filename, uploaded, skipped }) => {
             updateSyncStatus({
                 status: 'running',
@@ -258,12 +262,13 @@ export function startPromptTemplateSync(runtimeConfig: RuntimeConfig): PromptTem
             });
         }
     })
-        .then(({ uploaded, skipped }) => {
+        .then(({ uploaded, existing, skipped, total }) => {
             updateSyncStatus({
                 status: 'completed',
-                completed: uploaded + skipped,
-                total: uploads.length,
+                completed: uploaded,
+                total,
                 uploaded,
+                existing,
                 skipped,
                 currentFilename: null,
                 finishedAt: new Date().toISOString(),

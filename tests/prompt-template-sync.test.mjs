@@ -51,6 +51,7 @@ test('sync helper reports progress while uploading prompt template images', asyn
         'prompt-templates/ai-outfit-upgrade-report__german-minimal-streetwear-scorecard.webp'
     ]);
     assert.equal(result.uploaded, 2);
+    assert.equal(result.existing, 0);
     assert.equal(progressEvents.length, 2);
     assert.deepEqual(progressEvents.map((event) => event.completed), [1, 2]);
     assert.equal(progressEvents[0].total, 2);
@@ -88,12 +89,12 @@ test('sync helper skips files that already exist in R2', async () => {
         }
     );
 
-    assert.deepEqual(uploadedKeys, [
-        'prompt-templates/ai-outfit-upgrade-report__german-minimal-streetwear-scorecard.webp'
-    ]);
+    assert.deepEqual(uploadedKeys, ['prompt-templates/ai-outfit-upgrade-report__german-minimal-streetwear-scorecard.webp']);
     assert.equal(result.uploaded, 1);
-    assert.equal(result.skipped, 1);
-    assert.deepEqual(progressEvents.map((event) => event.skipped), [1, 1]);
+    assert.equal(result.existing, 1);
+    assert.equal(result.skipped, 0);
+    assert.deepEqual(progressEvents.map((event) => event.completed), [1]);
+    assert.equal(progressEvents[0].total, 1);
 });
 
 test('sync helper skips files when existence check times out', async () => {
@@ -137,5 +138,7 @@ test('sync helper skips files when existence check times out', async () => {
     ]);
     assert.equal(result.uploaded, 1);
     assert.equal(result.skipped, 1);
-    assert.deepEqual(progressEvents.map((event) => event.action), ['skipped', 'uploaded']);
+    assert.equal(result.existing, 0);
+    assert.deepEqual(progressEvents.map((event) => event.action), ['uploaded']);
+    assert.equal(progressEvents[0].total, 1);
 });
