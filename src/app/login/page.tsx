@@ -25,7 +25,13 @@ export default function LoginPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             });
-            const data = await response.json();
+            const bodyText = await response.text();
+            let data: { error?: string; user?: { role?: string } } = {};
+            try {
+                data = bodyText ? JSON.parse(bodyText) : {};
+            } catch {
+                data = {};
+            }
             if (!response.ok) throw new Error(data.error || 'Login failed.');
 
             const targetPath = data.user?.role === 'admin' ? '/admin' : '/';

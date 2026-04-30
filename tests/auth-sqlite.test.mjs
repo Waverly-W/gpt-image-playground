@@ -16,6 +16,7 @@ const auth = await import('../src/lib/auth.ts');
 const settings = await import('../src/lib/settings.ts');
 const users = await import('../src/lib/users.ts');
 const db = await import('../src/lib/sqlite-db.ts');
+const loginRoute = await import('../src/app/api/auth/login/route.ts');
 
 test.after(() => {
     db.closeDbForTests?.();
@@ -110,6 +111,36 @@ test('JWT secret is required in production', async () => {
     else process.env.JWT_SECRET = originalJwtSecret;
     if (originalAuthSecret === undefined) delete process.env.AUTH_SECRET;
     else process.env.AUTH_SECRET = originalAuthSecret;
+});
+
+test('login route returns JSON when production auth secret is missing', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalJwtSecret = process.env.JWT_SECRET;
+    const originalAuthSecret = process.env.AUTH_SECRET;
+
+    process.env.NODE_ENV = 'production';
+    delete process.env.JWT_SECRET;
+    delete process.env.AUTH_SECRET;
+
+    try {
+        const response = await loginRoute.POST(
+            new Request('https://example.com/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: 'admin@example.com', password: 'admin-secret' })
+            })
+        );
+        const body = await response.json();
+
+        assert.equal(response.status, 500);
+        assert.equal(body.error, 'Authentication is not configured on the server.');
+    } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+        if (originalJwtSecret === undefined) delete process.env.JWT_SECRET;
+        else process.env.JWT_SECRET = originalJwtSecret;
+        if (originalAuthSecret === undefined) delete process.env.AUTH_SECRET;
+        else process.env.AUTH_SECRET = originalAuthSecret;
+    }
 });
 
 test('auth cookie is not marked secure for plain HTTP even when NODE_ENV is production', () => {
