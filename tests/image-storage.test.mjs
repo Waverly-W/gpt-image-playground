@@ -7,17 +7,16 @@ test.afterEach(() => {
     process.env = { ...originalEnv };
 });
 
-test('image storage mode supports explicit r2 selection', async () => {
+test('image storage mode ignores legacy environment selection', async () => {
     process.env.NEXT_PUBLIC_IMAGE_STORAGE_MODE = 'r2';
     delete process.env.VERCEL;
 
-    const storage = await import(`../src/lib/image-storage.ts?case=r2-${Date.now()}`);
+    const storage = await import(`../src/lib/image-storage.ts?case=env-ignored-${Date.now()}`);
 
-    assert.equal(storage.resolveImageStorageMode(), 'r2');
+    assert.equal(storage.resolveImageStorageMode(), 'fs');
 });
 
 test('r2 storage validates required environment variables', async () => {
-    process.env.NEXT_PUBLIC_IMAGE_STORAGE_MODE = 'r2';
     delete process.env.CLOUDFLARE_R2_ACCOUNT_ID;
     delete process.env.CLOUDFLARE_R2_ACCESS_KEY_ID;
     delete process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;

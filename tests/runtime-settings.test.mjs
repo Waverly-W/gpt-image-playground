@@ -44,8 +44,7 @@ test('runtime config stores OpenAI settings in the database with env fallback', 
     });
 });
 
-test('runtime config stores image storage and R2 settings in the database with env fallback', () => {
-    process.env.NEXT_PUBLIC_IMAGE_STORAGE_MODE = 'fs';
+test('runtime config stores image storage in the database and R2 settings with env fallback', () => {
     process.env.CLOUDFLARE_R2_ACCOUNT_ID = 'env-account';
     process.env.CLOUDFLARE_R2_ACCESS_KEY_ID = 'env-access';
     process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY = 'env-secret';

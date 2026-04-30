@@ -77,7 +77,7 @@ function setOptionalSetting(key: string, value: unknown): void {
 }
 
 export function getRuntimeConfig(): RuntimeConfig {
-    const storageMode = getDbSettingOrEnv(IMAGE_STORAGE_MODE_KEY, ['NEXT_PUBLIC_IMAGE_STORAGE_MODE']);
+    const storageMode = getSetting(IMAGE_STORAGE_MODE_KEY) ?? '';
     const authCookieSecure = getDbSettingOrEnv(AUTH_COOKIE_SECURE_KEY, ['AUTH_COOKIE_SECURE']);
 
     return {
