@@ -8,10 +8,12 @@ const promptTemplateGallery = fs.readFileSync(
 );
 const themeProvider = fs.readFileSync(new URL('../src/components/theme-provider.tsx', import.meta.url), 'utf8');
 const rootLayout = fs.readFileSync(new URL('../src/app/layout.tsx', import.meta.url), 'utf8');
+const nextConfig = fs.readFileSync(new URL('../next.config.ts', import.meta.url), 'utf8');
 
-test('prompt template gallery uses a plain image element for runtime R2 host URLs', () => {
-    assert.doesNotMatch(promptTemplateGallery, /from 'next\/image'/);
-    assert.match(promptTemplateGallery, /<img/);
+test('prompt template gallery uses next image with the configured R2 image host', () => {
+    assert.match(promptTemplateGallery, /from 'next\/image'/);
+    assert.match(promptTemplateGallery, /<Image/);
+    assert.match(nextConfig, /pic\.waverlywang\.top/);
 });
 
 test('theme provider does not inject next-themes script during client rendering', () => {
