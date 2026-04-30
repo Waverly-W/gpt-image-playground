@@ -198,11 +198,11 @@ function JobPreview({ job }: { job: QueueImageJob }) {
 
 export function TaskQueuePanel({ jobs, onClearQueue }: TaskQueuePanelProps) {
     return (
-        <Card className='flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-black'>
-            <CardHeader className='flex flex-row items-center justify-between gap-3 border-b border-white/10 px-4 py-3'>
-                <div>
-                    <CardTitle className='text-lg font-medium text-white'>任务队列</CardTitle>
-                    <p className='mt-1 text-xs text-white/45'>最多 5 个任务同时生成。</p>
+        <Card className='flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-neutral-950'>
+            <CardHeader className='flex flex-row items-center justify-between gap-3 border-b border-white/10 px-4 py-4'>
+                <div className='min-w-0'>
+                    <CardTitle className='text-xl font-semibold text-white'>任务队列</CardTitle>
+                    <p className='mt-1 text-sm text-white/50'>最多 5 个任务同时生成，最新任务显示在顶部。</p>
                 </div>
                 {jobs.length > 0 && (
                     <Button
@@ -218,17 +218,20 @@ export function TaskQueuePanel({ jobs, onClearQueue }: TaskQueuePanelProps) {
             </CardHeader>
             <CardContent className='flex-1 overflow-y-auto p-4'>
                 {jobs.length === 0 ? (
-                    <div className='flex h-full min-h-[360px] items-center justify-center text-white/40'>
-                        <p>点击生成后，任务会显示在这里。</p>
+                    <div className='flex h-full min-h-[420px] items-center justify-center rounded-md border border-dashed border-white/10 bg-black text-center text-white/45'>
+                        <div className='flex max-w-xs flex-col items-center gap-3 px-6'>
+                            <ImageIcon className='h-8 w-8 text-white/25' />
+                            <p className='text-sm leading-6'>点击左侧生成或编辑按钮后，任务进度和结果会显示在这里。</p>
+                        </div>
                     </div>
                 ) : (
-                    <div className='space-y-3'>
+                    <div className='flex flex-col gap-3'>
                         {jobs.map((job) => (
                             <article
                                 key={job.id}
                                 className='flex gap-3 rounded-md border border-white/10 bg-neutral-950/70 p-3'>
                                 <JobPreview job={job} />
-                                <div className='min-w-0 flex-1 space-y-2'>
+                                <div className='flex min-w-0 flex-1 flex-col gap-2'>
                                     <div className='flex flex-wrap items-center gap-2'>
                                         <TaskStatusBadge status={job.status} />
                                         <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>

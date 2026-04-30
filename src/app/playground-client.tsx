@@ -252,121 +252,147 @@ export default function ImagePlaygroundClient({
     }, []);
 
     return (
-        <main className='flex min-h-screen flex-col items-center bg-black p-4 text-white md:p-8 lg:p-12'>
-            <div className='mb-4 flex w-full max-w-screen-2xl items-center justify-between text-sm text-white/70'>
-                <div>
-                    当前登录：{initialUser.email}（{initialUser.role === 'admin' ? '管理员' : '用户'}）
-                </div>
-                <div className='flex gap-3'>
-                    {initialUser.role === 'admin' && (
-                        <Link href='/admin' className='underline'>
-                            管理员面板
-                        </Link>
-                    )}
-                    <button type='button' onClick={handleLogout} className='underline'>
-                        退出登录
-                    </button>
-                </div>
-            </div>
-            <div className='grid w-full max-w-screen-2xl grid-cols-1 gap-6 lg:grid-cols-[minmax(420px,0.95fr)_minmax(520px,1.05fr)]'>
-                <div ref={formPanelRef} data-panel='form' className='relative flex h-[78vh] min-h-[620px] flex-col'>
-                    {error && (
-                        <Alert variant='destructive' className='mb-4 border-red-500/50 bg-red-900/20 text-red-300'>
-                            <AlertTitle className='text-red-200'>Error</AlertTitle>
-                            <AlertDescription>{error}</AlertDescription>
-                        </Alert>
-                    )}
-                    <div className={mode === 'generate' ? 'block h-full w-full' : 'hidden'}>
-                        <GenerationForm
-                            onSubmit={handleApiCall}
-                            isLoading={isCreatingJob}
-                            currentMode={mode}
-                            onModeChange={setMode}
-                            model={genModel}
-                            setModel={setGenModel}
-                            prompt={genPrompt}
-                            setPrompt={setGenPrompt}
-                            n={genN}
-                            setN={setGenN}
-                            size={genSize}
-                            setSize={setGenSize}
-                            customWidth={genCustomWidth}
-                            setCustomWidth={setGenCustomWidth}
-                            customHeight={genCustomHeight}
-                            setCustomHeight={setGenCustomHeight}
-                            quality={genQuality}
-                            setQuality={setGenQuality}
-                            outputFormat={genOutputFormat}
-                            setOutputFormat={setGenOutputFormat}
-                            compression={genCompression}
-                            setCompression={setGenCompression}
-                            background={genBackground}
-                            setBackground={setGenBackground}
-                            moderation={genModeration}
-                            setModeration={setGenModeration}
-                            enableStreaming={enableStreaming}
-                            setEnableStreaming={setEnableStreaming}
-                            partialImages={partialImages}
-                            setPartialImages={setPartialImages}
-                        />
+        <main className='min-h-screen bg-black text-white'>
+            <div className='mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4 py-4 md:px-6 md:py-6 lg:px-8'>
+                <header className='flex flex-col gap-4 rounded-lg border border-white/10 bg-neutral-950/80 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5'>
+                    <div className='min-w-0'>
+                        <p className='text-xs font-medium tracking-normal text-white/45 uppercase'>
+                            GPT Image Playground
+                        </p>
+                        <h1 className='mt-1 text-2xl font-semibold text-white'>图片生成工作台</h1>
+                        <p className='mt-1 max-w-2xl text-sm leading-6 text-white/60'>
+                            左侧配置生成或编辑参数，右侧查看任务进度和结果，下方可导入提示词模板。
+                        </p>
                     </div>
-                    <div className={mode === 'edit' ? 'block h-full w-full' : 'hidden'}>
-                        <EditingForm
-                            onSubmit={handleApiCall}
-                            isLoading={isCreatingJob}
-                            currentMode={mode}
-                            onModeChange={setMode}
-                            editModel={editModel}
-                            setEditModel={setEditModel}
-                            imageFiles={editImageFiles}
-                            sourceImagePreviewUrls={editSourceImagePreviewUrls}
-                            setImageFiles={setEditImageFiles}
-                            setSourceImagePreviewUrls={setEditSourceImagePreviewUrls}
-                            maxImages={MAX_EDIT_IMAGES}
-                            editPrompt={editPrompt}
-                            setEditPrompt={setEditPrompt}
-                            editN={editN}
-                            setEditN={setEditN}
-                            editSize={editSize}
-                            setEditSize={setEditSize}
-                            editCustomWidth={editCustomWidth}
-                            setEditCustomWidth={setEditCustomWidth}
-                            editCustomHeight={editCustomHeight}
-                            setEditCustomHeight={setEditCustomHeight}
-                            editQuality={editQuality}
-                            setEditQuality={setEditQuality}
-                            editBrushSize={editBrushSize}
-                            setEditBrushSize={setEditBrushSize}
-                            editShowMaskEditor={editShowMaskEditor}
-                            setEditShowMaskEditor={setEditShowMaskEditor}
-                            editGeneratedMaskFile={editGeneratedMaskFile}
-                            setEditGeneratedMaskFile={setEditGeneratedMaskFile}
-                            editIsMaskSaved={editIsMaskSaved}
-                            setEditIsMaskSaved={setEditIsMaskSaved}
-                            editOriginalImageSize={editOriginalImageSize}
-                            setEditOriginalImageSize={setEditOriginalImageSize}
-                            editDrawnPoints={editDrawnPoints}
-                            setEditDrawnPoints={setEditDrawnPoints}
-                            editMaskPreviewUrl={editMaskPreviewUrl}
-                            setEditMaskPreviewUrl={setEditMaskPreviewUrl}
-                            enableStreaming={enableStreaming}
-                            setEnableStreaming={setEnableStreaming}
-                            partialImages={partialImages}
-                            setPartialImages={setPartialImages}
-                        />
+                    <div className='flex flex-col gap-3 text-sm text-white/65 sm:flex-row sm:items-center'>
+                        <div className='min-w-0 rounded-md border border-white/10 bg-black px-3 py-2'>
+                            <span className='block truncate'>{initialUser.email}</span>
+                            <span className='text-xs text-white/40'>
+                                {initialUser.role === 'admin' ? '管理员' : '用户'}
+                            </span>
+                        </div>
+                        <div className='flex items-center gap-3'>
+                            {initialUser.role === 'admin' && (
+                                <Link
+                                    href='/admin'
+                                    className='rounded-md border border-white/15 px-3 py-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white'>
+                                    管理员面板
+                                </Link>
+                            )}
+                            <button
+                                type='button'
+                                onClick={handleLogout}
+                                className='rounded-md border border-white/15 px-3 py-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white'>
+                                退出登录
+                            </button>
+                        </div>
                     </div>
-                </div>
+                </header>
 
-                <div data-panel='task-queue' className='h-[78vh] min-h-[620px]'>
-                    <TaskQueuePanel jobs={jobs} onClearQueue={handleClearQueue} />
+                <section className='grid w-full grid-cols-1 gap-6 lg:grid-cols-[minmax(380px,440px)_minmax(0,1fr)] xl:grid-cols-[minmax(420px,480px)_minmax(0,1fr)]'>
+                    <div
+                        ref={formPanelRef}
+                        data-panel='form'
+                        className='relative flex min-h-[640px] flex-col lg:sticky lg:top-6 lg:h-[calc(100dvh-3rem)]'>
+                        {error && (
+                            <Alert variant='destructive' className='mb-4 border-red-500/50 bg-red-900/20 text-red-300'>
+                                <AlertTitle className='text-red-200'>Error</AlertTitle>
+                                <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        )}
+                        <div className={mode === 'generate' ? 'block h-full w-full' : 'hidden'}>
+                            <GenerationForm
+                                onSubmit={handleApiCall}
+                                isLoading={isCreatingJob}
+                                currentMode={mode}
+                                onModeChange={setMode}
+                                model={genModel}
+                                setModel={setGenModel}
+                                prompt={genPrompt}
+                                setPrompt={setGenPrompt}
+                                n={genN}
+                                setN={setGenN}
+                                size={genSize}
+                                setSize={setGenSize}
+                                customWidth={genCustomWidth}
+                                setCustomWidth={setGenCustomWidth}
+                                customHeight={genCustomHeight}
+                                setCustomHeight={setGenCustomHeight}
+                                quality={genQuality}
+                                setQuality={setGenQuality}
+                                outputFormat={genOutputFormat}
+                                setOutputFormat={setGenOutputFormat}
+                                compression={genCompression}
+                                setCompression={setGenCompression}
+                                background={genBackground}
+                                setBackground={setGenBackground}
+                                moderation={genModeration}
+                                setModeration={setGenModeration}
+                                enableStreaming={enableStreaming}
+                                setEnableStreaming={setEnableStreaming}
+                                partialImages={partialImages}
+                                setPartialImages={setPartialImages}
+                            />
+                        </div>
+                        <div className={mode === 'edit' ? 'block h-full w-full' : 'hidden'}>
+                            <EditingForm
+                                onSubmit={handleApiCall}
+                                isLoading={isCreatingJob}
+                                currentMode={mode}
+                                onModeChange={setMode}
+                                editModel={editModel}
+                                setEditModel={setEditModel}
+                                imageFiles={editImageFiles}
+                                sourceImagePreviewUrls={editSourceImagePreviewUrls}
+                                setImageFiles={setEditImageFiles}
+                                setSourceImagePreviewUrls={setEditSourceImagePreviewUrls}
+                                maxImages={MAX_EDIT_IMAGES}
+                                editPrompt={editPrompt}
+                                setEditPrompt={setEditPrompt}
+                                editN={editN}
+                                setEditN={setEditN}
+                                editSize={editSize}
+                                setEditSize={setEditSize}
+                                editCustomWidth={editCustomWidth}
+                                setEditCustomWidth={setEditCustomWidth}
+                                editCustomHeight={editCustomHeight}
+                                setEditCustomHeight={setEditCustomHeight}
+                                editQuality={editQuality}
+                                setEditQuality={setEditQuality}
+                                editBrushSize={editBrushSize}
+                                setEditBrushSize={setEditBrushSize}
+                                editShowMaskEditor={editShowMaskEditor}
+                                setEditShowMaskEditor={setEditShowMaskEditor}
+                                editGeneratedMaskFile={editGeneratedMaskFile}
+                                setEditGeneratedMaskFile={setEditGeneratedMaskFile}
+                                editIsMaskSaved={editIsMaskSaved}
+                                setEditIsMaskSaved={setEditIsMaskSaved}
+                                editOriginalImageSize={editOriginalImageSize}
+                                setEditOriginalImageSize={setEditOriginalImageSize}
+                                editDrawnPoints={editDrawnPoints}
+                                setEditDrawnPoints={setEditDrawnPoints}
+                                editMaskPreviewUrl={editMaskPreviewUrl}
+                                setEditMaskPreviewUrl={setEditMaskPreviewUrl}
+                                enableStreaming={enableStreaming}
+                                setEnableStreaming={setEnableStreaming}
+                                partialImages={partialImages}
+                                setPartialImages={setPartialImages}
+                            />
+                        </div>
+                    </div>
+
+                    <div data-panel='task-queue' className='min-h-[640px] lg:h-[calc(100dvh-3rem)]'>
+                        <TaskQueuePanel jobs={jobs} onClearQueue={handleClearQueue} />
+                    </div>
+                </section>
+
+                <div className='w-full'>
+                    <PromptTemplateGallery
+                        templates={promptTemplates}
+                        scenes={promptTemplateScenes}
+                        onImportPrompt={handleImportPromptTemplate}
+                    />
                 </div>
-            </div>
-            <div className='mt-8 w-full'>
-                <PromptTemplateGallery
-                    templates={promptTemplates}
-                    scenes={promptTemplateScenes}
-                    onImportPrompt={handleImportPromptTemplate}
-                />
             </div>
         </main>
     );

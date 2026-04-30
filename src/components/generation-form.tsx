@@ -188,30 +188,30 @@ export function GenerationForm({
     };
 
     return (
-        <Card className='flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-black'>
-            <CardHeader className='flex items-start justify-between border-b border-white/10 pb-4'>
-                <div>
+        <Card className='flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-neutral-950'>
+            <CardHeader className='flex flex-col gap-4 border-b border-white/10 pb-4 sm:flex-row sm:items-start sm:justify-between'>
+                <div className='min-w-0'>
                     <div className='flex items-center'>
-                        <CardTitle className='py-1 text-lg font-medium text-white'>生成图片</CardTitle>
+                        <CardTitle className='py-1 text-xl font-semibold text-white'>生成图片</CardTitle>
                     </div>
                     <CardDescription className='mt-1 text-white/60'>根据文字提示词创建新图片。</CardDescription>
                 </div>
                 <ModeToggle currentMode={currentMode} onModeChange={onModeChange} />
             </CardHeader>
             <form onSubmit={handleSubmit} className='flex h-full flex-1 flex-col overflow-hidden'>
-                <CardContent className='flex-1 space-y-5 overflow-y-auto p-4'>
-                    <div className='space-y-1.5'>
+                <CardContent className='flex flex-1 flex-col gap-5 overflow-y-auto p-4'>
+                    <div className='flex flex-col gap-1.5'>
                         <Label htmlFor='model-select' className='text-white'>
                             模型
                         </Label>
-                        <div className='flex items-center gap-4'>
+                        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4'>
                             <Select
                                 value={model}
                                 onValueChange={(value) => setModel(value as GenerationFormData['model'])}
                                 disabled={isLoading}>
                                 <SelectTrigger
                                     id='model-select'
-                                    className='w-[180px] rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50'>
+                                    className='w-full rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50 sm:w-[180px]'>
                                     <SelectValue placeholder='选择模型' />
                                 </SelectTrigger>
                                 <SelectContent className='z-[100] border-white/20 bg-black text-white'>
