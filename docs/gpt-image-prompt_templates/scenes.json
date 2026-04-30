@@ -1,0 +1,308 @@
+[
+  {
+    "id": "93e51f07-8680-4f8e-b81f-13501c6835dd",
+    "slug": "ai-outfit-upgrade-report",
+    "name": "衣品升级",
+    "title": "衣品升级模板",
+    "description": "用 GPT Image 2 生成穿搭改造报告。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/cn-clean-fit-style-report-zh-2-6dc3eeb3-6646-440e-995d-70c38953b02e.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "6ddfb5dc-6a4e-41cd-b12c-e91701aad044",
+    "slug": "big-type-posters",
+    "name": "大字海报",
+    "title": "大字海报模板",
+    "description": "用 GPT Image 2 生成文字优先的海报。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/monumental-character-gate-zh-tw-2-0b80d9b3-38c7-41a8-bdca-8de5a52685eb.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "90c6d895-4451-40e7-b07d-1949b12f8016",
+    "slug": "biomimicry-product-concepts",
+    "name": "仿生概念",
+    "title": "仿生产品概念",
+    "description": "用 GPT Image 2 生成自然灵感产品板。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/bamboo-weave-folding-chair-zh-2-82529054-1d22-4140-afe6-e8e1c45eb58f.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "6b97e0e0-d8e0-4f4a-8652-8f5399f52e7b",
+    "slug": "character-design-charts",
+    "name": "角色设定",
+    "title": "角色设定模板",
+    "description": "用 GPT Image 2 生成角色设定图。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/action-pose-turnaround-zh-tw-3-abf17fa4-99a3-4522-8b4b-f1e87e15f8d1.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "5cdff762-fad8-40ff-a52c-51eb2e44e8e1",
+    "slug": "concept-posters",
+    "name": "概念海报",
+    "title": "概念海报模板",
+    "description": "用 GPT Image 2 生成隐喻海报。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/serene-blessing-poster-zh-1-5e11b0e6-9bad-4ebf-9cb4-54471a9b6102.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "e5ed20d3-78cd-448d-aae9-27b6e7bf1af8",
+    "slug": "cutaway-educational-picture-books",
+    "name": "剖面绘本",
+    "title": "剖面科普绘本",
+    "description": "用 GPT Image 2 生成儿童友好的剖面科普页。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/heart-cutaway-story-page-zh-tw-3-2349c851-44bf-438e-9925-cded2de0e1ab.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "a1a4b546-2f5c-44c7-8d36-9334bf710b61",
+    "slug": "double-exposure-character-posters",
+    "name": "角色海报",
+    "title": "角色海报模板",
+    "description": "用可复用提示词生成双重曝光角色海报。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/mythic-guardian-poster-en-1-02bd1a1c-0a99-43d7-b084-fdb548959db9.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "30249ac2-930f-42c2-bf7b-3ead55f0d443",
+    "slug": "eastern-myth-portraits",
+    "name": "东方神话肖像",
+    "title": "神话肖像海报",
+    "description": "用 GPT Image 2 模板生成东方神话肖像。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/nuwa-creation-poster-zh-2-47c2b5df-0a70-4aa1-9cbf-87d1d906a4f5.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "b0b09766-b91d-46e2-bcc0-73e4a7fcd8ee",
+    "slug": "evolution-history-infographics",
+    "name": "进化信息图",
+    "title": "进化史信息图",
+    "description": "把任意主题进化史变成结构化信息图。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/taiwan-tea-evolution-zh-tw-3-fe6c4c17-5513-43c2-954c-6dacb67a54af.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "2e71bda0-39ff-4ec5-b725-22bd5efcc41e",
+    "slug": "exploded-assembly-drawings",
+    "name": "爆炸结构",
+    "title": "爆炸结构模板",
+    "description": "用 GPT Image 2 生成清晰拆解图。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/compact-camera-exploded-view-en-1-09fb46e9-3e0a-4a5d-be9f-e22d4c074161.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "8864dc70-13ee-4b94-a695-980a27cfb826",
+    "slug": "facial-aesthetic-report",
+    "name": "五官美学",
+    "title": "五官报告模板",
+    "description": "用 GPT Image 2 生成自然五官报告。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/traditional-face-reset-board-zh-tw-3-d5b7bfa3-d29b-4c05-9ae6-5d1822fbabb1.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "734aac6c-16ab-4e41-b064-5f6d8284822a",
+    "slug": "hairstyle-upgrade-report",
+    "name": "发型升级",
+    "title": "发型报告模板",
+    "description": "上传头像，用 GPT Image 2 生成发型升级报告。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/bangs-and-face-shape-report-zh-tw-3-6016ce97-8440-4e2d-a577-8649efcb0956.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "7769cce1-e92e-4136-9463-8ff9438681bb",
+    "slug": "hanfu-outfit-portraits",
+    "name": "汉服人像",
+    "title": "汉服人像模板",
+    "description": "用参考服装生成全身汉服人像。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/spring-garden-hanfu-portrait-zh-2-f8da564b-4267-48b2-b364-36abe59f29eb.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "3920c60a-4e22-47dd-ac44-89284067f4c2",
+    "slug": "holographic-anime-cards",
+    "name": "镭射卡",
+    "title": "镭射角色卡",
+    "description": "用 GPT Image 2 生成原创闪卡角色。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/neon-idol-foil-card-zh-tw-3-eae25d10-70fb-4018-9127-f09a35a700b5.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "565aa8ef-ffd9-498d-a2e7-2f9e83563d93",
+    "slug": "lipstick-recommendation-report",
+    "name": "口红报告",
+    "title": "口红报告模板",
+    "description": "用提示词生成口红试色推荐报告。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/xiaohongshu-lipstick-guide-zh-zh-2-bcbb2201-5a33-4adb-8fe7-f4c9ad6347a0.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "f81edb51-8afe-4454-a361-020a653116f1",
+    "slug": "luxury-skincare-storyboards",
+    "name": "护肤分镜",
+    "title": "护肤分镜模板",
+    "description": "用 GPT Image 2 生成高端护肤视觉。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/milky-skincare-campaign-collage-en-1-d231a4c8-d0de-44e5-a784-655330075c78.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "3c4f1c26-db84-4332-8771-e3cd54316c9e",
+    "slug": "matchday-posters",
+    "name": "赛日海报",
+    "title": "赛日海报模板",
+    "description": "用 GPT Image 2 生成球队赛日海报。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/argentina-football-pride-poster-en-1-602bc1d3-c8d1-4b41-b322-01cfa6334aeb.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "d671c3fd-15a2-4d48-8e20-9d6997db2346",
+    "slug": "object-fashion-concepts",
+    "name": "物品时装",
+    "title": "物品时装提示词",
+    "description": "用 GPT Image 2 把参考物变成服装概念。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/botanical-flowing-dress-zh-tw-3-2f2740a1-73db-467a-950c-949f90c24c4d.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "39d73242-72f2-403c-983c-56bf39869dfc",
+    "slug": "old-photo-restoration",
+    "name": "照片修复",
+    "title": "老照片修复",
+    "description": "用 GPT Image 2 修复旧照并保留人物特征。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/classic-family-portrait-restoration-en-1-f4c37295-32a0-40de-bbf1-9d1206320f34.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "28929e6c-c3a4-4566-9aef-c3594e2443a6",
+    "slug": "palmistry-infographics",
+    "name": "手相图解",
+    "title": "手相图解模板",
+    "description": "用手掌照片生成娱乐手相报告。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/social-palm-reading-card-de-2-bf2cd6dc-e450-4566-bc67-9820591033ce.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "20eb0c63-745b-4812-b22b-85b9e2b1f832",
+    "slug": "personal-color-analysis",
+    "name": "色彩分析",
+    "title": "色彩分析模板",
+    "description": "用 GPT Image 2 生成个人色盘报告。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/soft-autumn-color-analysis-en-1-52bf5e95-df07-4b0d-9268-6849bf312dbb.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "3bb6f4b4-e833-4eca-830d-cafa9410c0fa",
+    "slug": "perspective-type-posters",
+    "name": "透视字",
+    "title": "透视字海报",
+    "description": "用 GPT Image 2 生成斜面字体海报。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/traditional-motion-phrase-zh-tw-3-5950f323-e676-45c8-95a6-cfa826eda012.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "2433acc8-b63a-467f-ab5a-9d454e5c1eea",
+    "slug": "poetry-analysis-posters",
+    "name": "诗歌海报",
+    "title": "诗歌海报模板",
+    "description": "用 GPT Image 2 提示词生成诗歌解析海报。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/chinese-poem-ink-poster-zh-2-e88a5c0c-4fbb-4ba4-8dd7-d685feb1c0e7.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "0017b790-5679-4fa7-9fc2-c14512b73de6",
+    "slug": "premium-typography-posters",
+    "name": "字体海报",
+    "title": "字体海报模板",
+    "description": "用 GPT Image 2 生成精确标题海报。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/exact-title-editorial-poster-en-1-79ce1ba6-22fc-4a8c-a5d5-95ff5f0c6a6e.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "f27c8886-9429-49c9-8047-34fb71610c7d",
+    "slug": "retro-punk-gig-posters",
+    "name": "朋克海报",
+    "title": "朋克海报模板",
+    "description": "用 GPT Image 2 生成粗粝丝印海报。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/chinese-poetry-punk-poster-zh-2-4fe6ab3b-ac03-4720-965f-b1e9693f1889.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "714b1679-f175-4460-98f6-b67830961e7f",
+    "slug": "satirical-line-illustrations",
+    "name": "讽刺线稿",
+    "title": "讽刺线稿模板",
+    "description": "把主题变成讽刺线稿插画。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/traditional-secrecy-metaphor-zh-tw-3-97c6bb9c-c50d-4542-ac6e-647529e83716.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "6fd05918-8cc0-402c-aef7-ad6fe5e701c5",
+    "slug": "silhouette-story-posters",
+    "name": "剪影故事",
+    "title": "剪影故事海报",
+    "description": "用剪影世界生成个人叙事海报。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/graduate-legend-silhouette-en-1-4f7aff5e-9891-42dd-b389-b2beb19d0160.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "85155f50-5671-4cc7-9d0c-a0fa5d5a15d6",
+    "slug": "silk-embroidery-birds",
+    "name": "丝线花鸟",
+    "title": "丝绣花鸟模板",
+    "description": "用 GPT Image 2 生成柔和丝线花鸟图。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/vertical-magnolia-songbirds-zh-tw-3-118aa624-e551-43c7-ac56-4b8c86d375aa.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "111ff55e-93f1-4047-bdad-11a259d0a197",
+    "slug": "smart-photo-remix",
+    "name": "照片改图",
+    "title": "智能改图模板",
+    "description": "清理照片并生成适合社交分享的图片。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/universal-clean-photo-remix-en-1-e04ac1e5-e797-41f9-a8b7-0e9bc33fce0e.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "5c9295f5-2871-4c18-8dbb-6a2f30a56168",
+    "slug": "sports-fashion-ad-posters",
+    "name": "运动广告",
+    "title": "运动广告模板",
+    "description": "用 GPT Image 2 生成高端运动海报。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/basketball-elevation-ad-en-1-d67a02a8-38c0-464d-b4e8-a5f1d75f79c5.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "d2099b01-be86-4684-9381-f60720e52d56",
+    "slug": "style-persona-choice-posters",
+    "name": "气质三选",
+    "title": "气质三选海报",
+    "description": "一张自拍生成三种穿搭气质。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/cold-soft-relaxed-choice-zh-2-97e76aa9-2fda-4fb7-8738-aaf258077d92.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "83469448-8835-4c90-b953-510772b33a39",
+    "slug": "time-slice-city-dioramas",
+    "name": "城市纸雕",
+    "title": "城市纸雕模板",
+    "description": "用 GPT Image 2 生成城市纸雕。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/hero-landmark-time-slice-en-1-dfcf0d96-e819-42e9-8560-ee8724c8a37d.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "d6d41a0e-9275-44a1-bfb7-e37bdc936533",
+    "slug": "travel-memory-poster",
+    "name": "旅行海报",
+    "title": "旅行回忆海报",
+    "description": "生成路线地图、宝丽来和行程数据海报。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/san-francisco-route-keepsake-en-1-4693ed30-2d00-4a05-8110-0933e377c877.webp",
+    "promptCount": 9
+  },
+  {
+    "id": "bbe4fba2-150f-40cd-bceb-5af997e32f20",
+    "slug": "word-visuals",
+    "name": "文字视觉",
+    "title": "文字视觉模板",
+    "description": "用 GPT Image 2 生成语义字体视觉。",
+    "coverImage": "https://image.gpt-image-prompt.com/images/apimart/scene-template/traditional-character-artifact-zh-tw-3-bf6b0c20-056a-44c7-a86f-6557621b6611.webp",
+    "promptCount": 9
+  }
+]
