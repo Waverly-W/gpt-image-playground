@@ -39,6 +39,29 @@ function migrate(database: Database.Database) {
             owner_user_id TEXT NOT NULL,
             created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS image_jobs (
+            id TEXT PRIMARY KEY,
+            owner_user_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            mode TEXT NOT NULL,
+            prompt TEXT NOT NULL,
+            model TEXT NOT NULL,
+            params_json TEXT NOT NULL,
+            images_json TEXT NOT NULL DEFAULT '[]',
+            usage_json TEXT,
+            cost_json TEXT,
+            storage_mode_used TEXT,
+            duration_ms INTEGER,
+            error TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            started_at TEXT,
+            finished_at TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_image_jobs_owner_updated
+            ON image_jobs (owner_user_id, updated_at DESC);
     `);
 }
 

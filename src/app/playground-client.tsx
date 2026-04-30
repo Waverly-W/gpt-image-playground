@@ -60,6 +60,23 @@ type DisplayImage = {
     storageMode?: ApiStorageMode;
 };
 
+type ImageJobDto = {
+    id: string;
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    mode: 'generate' | 'edit';
+    prompt: string;
+    model: GptImageModel;
+    params: Record<string, unknown>;
+    images: Array<{ filename: string; path?: string; output_format?: string }>;
+    storageModeUsed: ApiStorageMode | null;
+    durationMs: number | null;
+    costDetails: CostDetails | null;
+    error: string | null;
+    createdAt: string;
+    updatedAt: string;
+    finishedAt: string | null;
+};
+
 export default function ImagePlaygroundClient({ initialUser }: { initialUser: SessionUser }) {
     const [mode, setMode] = React.useState<'generate' | 'edit'>('generate');
     const [isLoading, setIsLoading] = React.useState(false);
@@ -68,6 +85,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
     const [latestImageBatch, setLatestImageBatch] = React.useState<DisplayImage[] | null>(null);
     const [imageOutputView, setImageOutputView] = React.useState<'grid' | number>('grid');
     const [history, setHistory] = React.useState<HistoryMetadata[]>([]);
+    const [activeJobIds, setActiveJobIds] = React.useState<string[]>([]);
     const [isInitialLoad, setIsInitialLoad] = React.useState(true);
     const blobUrlCacheRef = React.useRef<Map<string, string>>(new Map());
     const [skipDeleteConfirmation, setSkipDeleteConfirmation] = React.useState<boolean>(false);
@@ -243,6 +261,151 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
         return 'image/png';
     };
 
+    const jobToHistoryEntry = React.useCallback(
+        (job: ImageJobDto): HistoryMetadata | null => {
+            if (job.status !== 'completed' || job.images.length === 0) return null;
+            const quality =
+                typeof job.params.quality === 'string'
+                    ? (job.params.quality as GenerationFormData['quality'])
+                    : ('auto' as const);
+            const background =
+                typeof job.params.background === 'string'
+                    ? (job.params.background as GenerationFormData['background'])
+                    : ('auto' as const);
+            const moderation =
+                typeof job.params.moderation === 'string'
+                    ? (job.params.moderation as GenerationFormData['moderation'])
+                    : ('auto' as const);
+            const outputFormat =
+                typeof job.params.output_format === 'string'
+                    ? (job.params.output_format as GenerationFormData['output_format'])
+                    : ((job.images[0]?.output_format as GenerationFormData['output_format']) ?? 'png');
+
+            return {
+                timestamp: new Date(job.finishedAt ?? job.updatedAt).getTime(),
+                images: job.images.map((img) => ({ filename: img.filename })),
+                storageModeUsed: job.storageModeUsed ?? 'fs',
+                durationMs: job.durationMs ?? 0,
+                quality,
+                background,
+                moderation,
+                output_format: outputFormat,
+                prompt: job.prompt,
+                mode: job.mode,
+                costDetails: job.costDetails,
+                model: job.model,
+                ownerUserId: initialUser.id
+            };
+        },
+        [initialUser.id]
+    );
+
+    const imageBatchFromJob = React.useCallback((job: ImageJobDto): DisplayImage[] => {
+        const storageMode = job.storageModeUsed ?? 'fs';
+        return job.images.map((image) => ({
+            filename: image.filename,
+            path: image.path ?? `/api/image/${image.filename}`,
+            storageMode
+        }));
+    }, []);
+
+    const upsertCompletedJobHistory = React.useCallback(
+        (job: ImageJobDto) => {
+            const entry = jobToHistoryEntry(job);
+            if (!entry) return;
+
+            setHistory((prevHistory) => {
+                const withoutDuplicate = prevHistory.filter(
+                    (item) =>
+                        !(
+                            item.images.length === entry.images.length &&
+                            item.images.every((image, index) => image.filename === entry.images[index]?.filename)
+                        )
+                );
+                return [entry, ...withoutDuplicate].sort((a, b) => b.timestamp - a.timestamp);
+            });
+        },
+        [jobToHistoryEntry]
+    );
+
+    React.useEffect(() => {
+        let cancelled = false;
+
+        const loadJobs = async () => {
+            try {
+                const response = await fetch('/api/image-jobs');
+                if (!response.ok) return;
+                const result = (await response.json()) as { jobs?: ImageJobDto[] };
+                if (cancelled || !Array.isArray(result.jobs)) return;
+
+                const activeIds: string[] = [];
+                result.jobs.forEach((job) => {
+                    if (job.status === 'completed') {
+                        upsertCompletedJobHistory(job);
+                    } else if (job.status === 'pending' || job.status === 'running') {
+                        activeIds.push(job.id);
+                    }
+                });
+                setActiveJobIds(activeIds);
+            } catch (jobLoadError) {
+                console.error('Failed to load image jobs:', jobLoadError);
+            }
+        };
+
+        loadJobs();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [upsertCompletedJobHistory]);
+
+    React.useEffect(() => {
+        if (activeJobIds.length === 0) return;
+
+        let cancelled = false;
+        const poll = async () => {
+            try {
+                const settledIds = new Set<string>();
+                await Promise.all(
+                    activeJobIds.map(async (jobId) => {
+                        const response = await fetch(`/api/image-jobs/${jobId}`);
+                        if (!response.ok) return;
+
+                        const result = (await response.json()) as { job?: ImageJobDto };
+                        const job = result.job;
+                        if (!job || cancelled) return;
+
+                        if (job.status === 'completed') {
+                            settledIds.add(job.id);
+                            upsertCompletedJobHistory(job);
+                            const batch = imageBatchFromJob(job);
+                            setLatestImageBatch(batch);
+                            setImageOutputView(batch.length > 1 ? 'grid' : 0);
+                            setError(null);
+                        } else if (job.status === 'failed') {
+                            settledIds.add(job.id);
+                            setError(job.error || 'Image generation failed.');
+                        }
+                    })
+                );
+
+                if (!cancelled && settledIds.size > 0) {
+                    setActiveJobIds((prev) => prev.filter((id) => !settledIds.has(id)));
+                }
+            } catch (pollError) {
+                console.error('Failed to poll image jobs:', pollError);
+            }
+        };
+
+        poll();
+        const interval = window.setInterval(poll, 2000);
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(interval);
+        };
+    }, [activeJobIds, imageBatchFromJob, upsertCompletedJobHistory]);
+
     const handleApiCall = async (formData: GenerationFormData | EditingFormData) => {
         const startTime = Date.now();
         let durationMs = 0;
@@ -302,6 +465,21 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
         }
 
         try {
+            if (!enableStreaming) {
+                const response = await fetch('/api/image-jobs', {
+                    method: 'POST',
+                    body: apiFormData
+                });
+                const result = (await response.json()) as { job?: ImageJobDto; error?: string };
+
+                if (!response.ok || !result.job) {
+                    throw new Error(result.error || `Job request failed with status ${response.status}`);
+                }
+
+                setActiveJobIds((prev) => (prev.includes(result.job!.id) ? prev : [result.job!.id, ...prev]));
+                return;
+            }
+
             const response = await fetch('/api/images', {
                 method: 'POST',
                 body: apiFormData
@@ -652,6 +830,8 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
 
             try {
                 localStorage.removeItem('openaiImageHistory');
+                await fetch('/api/image-jobs', { method: 'DELETE' });
+                setActiveJobIds([]);
 
                 if (effectiveStorageModeClient === 'indexeddb') {
                     await db.images.clear();
@@ -798,6 +978,9 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
         setItemToDeleteConfirm(null);
     }, []);
 
+    const isGenerationBusy = isLoading || activeJobIds.length > 0;
+    const isOutputBusy = isGenerationBusy || isSendingToEdit;
+
     return (
         <main className='flex min-h-screen flex-col items-center bg-black p-4 text-white md:p-8 lg:p-12'>
             <div className='mb-4 flex w-full max-w-screen-2xl items-center justify-between text-sm text-white/70'>
@@ -821,7 +1004,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                         <div className={mode === 'generate' ? 'block h-full w-full' : 'hidden'}>
                             <GenerationForm
                                 onSubmit={handleApiCall}
-                                isLoading={isLoading}
+                                isLoading={isGenerationBusy}
                                 currentMode={mode}
                                 onModeChange={setMode}
                                 model={genModel}
@@ -855,7 +1038,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                         <div className={mode === 'edit' ? 'block h-full w-full' : 'hidden'}>
                             <EditingForm
                                 onSubmit={handleApiCall}
-                                isLoading={isLoading || isSendingToEdit}
+                                isLoading={isOutputBusy}
                                 currentMode={mode}
                                 onModeChange={setMode}
                                 editModel={editModel}
@@ -910,7 +1093,7 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
                             viewMode={imageOutputView}
                             onViewChange={setImageOutputView}
                             altText='Generated image output'
-                            isLoading={isLoading || isSendingToEdit}
+                            isLoading={isOutputBusy}
                             onSendToEdit={handleSendToEdit}
                             currentMode={mode}
                             baseImagePreviewUrl={editSourceImagePreviewUrls[0] || null}
