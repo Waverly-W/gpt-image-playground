@@ -174,7 +174,23 @@ export async function syncPromptTemplateImagesToR2(
     for (const [index, upload] of uploads.entries()) {
         await deps.onCurrentFile?.(upload.filename);
 
-        if (await withRetry(() => objectExists(upload.key, runtimeConfig), `Check ${upload.filename}`)) {
+        let exists = false;
+        try {
+            exists = await withRetry(() => objectExists(upload.key, runtimeConfig), `Check ${upload.filename}`);
+        } catch {
+            skipped += 1;
+            await deps.onProgress?.({
+                completed: index + 1,
+                total: uploads.length,
+                filename: upload.filename,
+                uploaded,
+                skipped,
+                action: 'skipped'
+            });
+            continue;
+        }
+
+        if (exists) {
             skipped += 1;
             await deps.onProgress?.({
                 completed: index + 1,

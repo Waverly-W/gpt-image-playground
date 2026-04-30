@@ -95,3 +95,47 @@ test('sync helper skips files that already exist in R2', async () => {
     assert.equal(result.skipped, 1);
     assert.deepEqual(progressEvents.map((event) => event.skipped), [1, 1]);
 });
+
+test('sync helper skips files when existence check times out', async () => {
+    const uploadedKeys = [];
+    const progressEvents = [];
+
+    const result = await sync.syncPromptTemplateImagesToR2(
+        {
+            openaiApiKey: '',
+            openaiBaseUrl: '',
+            imageStorageMode: 'r2',
+            r2AccountId: 'account',
+            r2AccessKeyId: 'access',
+            r2SecretAccessKey: 'secret',
+            r2Bucket: 'bucket',
+            r2Endpoint: 'https://account.r2.cloudflarestorage.com',
+            r2PublicBaseUrl: 'https://cdn.example/assets',
+            authCookieSecure: 'auto',
+            registrationEnabled: true
+        },
+        {
+            uploads: sync.listPromptTemplateUploads().slice(0, 2),
+            readFile: async () => Buffer.from('image'),
+            objectExists: async (key) => {
+                if (key === 'prompt-templates/ai-outfit-upgrade-report__french-parisian-style-reset.webp') {
+                    throw new Error('Check timed out after 20000ms');
+                }
+                return false;
+            },
+            uploadObject: async (key) => {
+                uploadedKeys.push(key);
+            },
+            onProgress: (event) => {
+                progressEvents.push(event);
+            }
+        }
+    );
+
+    assert.deepEqual(uploadedKeys, [
+        'prompt-templates/ai-outfit-upgrade-report__german-minimal-streetwear-scorecard.webp'
+    ]);
+    assert.equal(result.uploaded, 1);
+    assert.equal(result.skipped, 1);
+    assert.deepEqual(progressEvents.map((event) => event.action), ['skipped', 'uploaded']);
+});
