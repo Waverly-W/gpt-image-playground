@@ -276,7 +276,7 @@ function HistoryPanelImpl({
                                                         {originalStorageMode === 'fs'
                                                             ? '文件'
                                                             : originalStorageMode === 'r2'
-                                                              ? 'r2'
+                                                              ? 'R2'
                                                               : 'db'}
                                                     </span>
                                                 </div>
