@@ -15,6 +15,7 @@ test('r2 config can be resolved from unsaved runtime settings', async () => {
             r2SecretAccessKey: 'settings-secret',
             r2Bucket: 'settings-bucket',
             r2Endpoint: '',
+            r2PublicBaseUrl: 'https://cdn.settings.example/templates/',
             authCookieSecure: 'auto',
             registrationEnabled: true
         }),
@@ -23,7 +24,8 @@ test('r2 config can be resolved from unsaved runtime settings', async () => {
             accessKeyId: 'settings-access',
             secretAccessKey: 'settings-secret',
             bucket: 'settings-bucket',
-            endpoint: 'https://settings-account.r2.cloudflarestorage.com'
+            endpoint: 'https://settings-account.r2.cloudflarestorage.com',
+            publicBaseUrl: 'https://cdn.settings.example/templates'
         }
     );
 });
@@ -32,5 +34,7 @@ test('admin runtime settings include an r2 connection test action', () => {
     const adminPageSource = readFileSync(new URL('../src/app/admin/page.tsx', import.meta.url), 'utf8');
 
     assert.match(adminPageSource, /测试 R2 连接/);
+    assert.match(adminPageSource, /上传模板图片到 R2/);
+    assert.match(adminPageSource, /R2 Public Base URL/);
     assert.match(adminPageSource, /\/api\/admin\/settings\/r2-test/);
 });

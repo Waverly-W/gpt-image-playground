@@ -30,6 +30,7 @@ type RuntimeSettings = {
     r2SecretAccessKey: string;
     r2Bucket: string;
     r2Endpoint: string;
+    r2PublicBaseUrl: string;
     authCookieSecure: 'auto' | 'true' | 'false';
     registrationEnabled: boolean;
 };
@@ -43,6 +44,7 @@ const emptyRuntimeSettings: RuntimeSettings = {
     r2SecretAccessKey: '',
     r2Bucket: '',
     r2Endpoint: '',
+    r2PublicBaseUrl: '',
     authCookieSecure: 'auto',
     registrationEnabled: true
 };
@@ -66,6 +68,7 @@ export default function AdminPage() {
     const [runtimeSettings, setRuntimeSettings] = React.useState<RuntimeSettings>(emptyRuntimeSettings);
     const [isSavingSettings, setIsSavingSettings] = React.useState(false);
     const [isTestingR2, setIsTestingR2] = React.useState(false);
+    const [isSyncingPromptTemplates, setIsSyncingPromptTemplates] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [message, setMessage] = React.useState<string | null>(null);
     const [newEmail, setNewEmail] = React.useState('');
@@ -220,6 +223,19 @@ export default function AdminPage() {
     const logout = async () => {
         await fetch('/api/auth/logout', { method: 'POST' });
         window.location.assign('/login');
+    };
+
+    const syncPromptTemplateImages = async () => {
+        try {
+            setIsSyncingPromptTemplates(true);
+            setError(null);
+            const data = await api('/api/admin/prompt-template-images/sync', { method: 'POST' });
+            setMessage(`模板图片已上传到 R2，共 ${data.uploaded ?? 0} 张。`);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '上传模板图片失败');
+        } finally {
+            setIsSyncingPromptTemplates(false);
+        }
     };
 
     return (
@@ -391,6 +407,12 @@ export default function AdminPage() {
                                         onChange={(value) => updateRuntimeSetting('r2Endpoint', value)}
                                         placeholder='https://account-id.r2.cloudflarestorage.com'
                                     />
+                                    <RuntimeInput
+                                        label='R2 Public Base URL'
+                                        value={runtimeSettings.r2PublicBaseUrl}
+                                        onChange={(value) => updateRuntimeSetting('r2PublicBaseUrl', value)}
+                                        placeholder='https://cdn.example.com/assets'
+                                    />
                                     <div className='grid gap-3 md:grid-cols-2'>
                                         <Button
                                             type='button'
@@ -401,8 +423,18 @@ export default function AdminPage() {
                                             {isTestingR2 ? '测试中...' : '测试 R2 连接'}
                                         </Button>
                                         <Button
+                                            type='button'
+                                            variant='outline'
+                                            disabled={isSavingSettings || isTestingR2 || isSyncingPromptTemplates}
+                                            onClick={syncPromptTemplateImages}
+                                            className='border-white/20 bg-black/40 text-white hover:bg-white/10'>
+                                            {isSyncingPromptTemplates ? '上传中...' : '上传模板图片到 R2'}
+                                        </Button>
+                                    </div>
+                                    <div className='grid gap-3 md:grid-cols-1'>
+                                        <Button
                                             type='submit'
-                                            disabled={isSavingSettings || isTestingR2}
+                                            disabled={isSavingSettings || isTestingR2 || isSyncingPromptTemplates}
                                             className='bg-white text-black hover:bg-white/90'>
                                             {isSavingSettings ? '保存中...' : '保存运行配置'}
                                         </Button>

@@ -49,6 +49,7 @@ test('runtime config stores image storage in the database and R2 settings with e
     process.env.CLOUDFLARE_R2_ACCESS_KEY_ID = 'env-access';
     process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY = 'env-secret';
     process.env.CLOUDFLARE_R2_BUCKET = 'env-bucket';
+    process.env.CLOUDFLARE_R2_PUBLIC_BASE_URL = 'https://env-cdn.example';
 
     settings.setRuntimeConfig({
         imageStorageMode: 'r2',
@@ -56,7 +57,8 @@ test('runtime config stores image storage in the database and R2 settings with e
         r2AccessKeyId: 'db-access',
         r2SecretAccessKey: 'db-secret',
         r2Bucket: 'db-bucket',
-        r2Endpoint: 'https://custom.example'
+        r2Endpoint: 'https://custom.example',
+        r2PublicBaseUrl: 'https://cdn.example/prompt-assets/'
     });
 
     assert.equal(imageStorage.resolveImageStorageMode(), 'r2');
@@ -65,7 +67,8 @@ test('runtime config stores image storage in the database and R2 settings with e
         accessKeyId: 'db-access',
         secretAccessKey: 'db-secret',
         bucket: 'db-bucket',
-        endpoint: 'https://custom.example'
+        endpoint: 'https://custom.example',
+        publicBaseUrl: 'https://cdn.example/prompt-assets'
     });
 });
 

@@ -7,7 +7,7 @@ import { TaskQueuePanel, type QueueImageJob } from '@/components/task-queue-pane
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { type SessionUser } from '@/lib/auth';
 import type { CostDetails, GptImageModel } from '@/lib/cost-utils';
-import { PROMPT_TEMPLATE_SCENES, PROMPT_TEMPLATES } from '@/lib/prompt-template-data';
+import type { PromptTemplate, PromptTemplateScene } from '@/lib/prompt-template-data';
 import { getPresetDimensions } from '@/lib/size-utils';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -41,7 +41,15 @@ type DrawnPoint = {
 
 const MAX_EDIT_IMAGES = 10;
 
-export default function ImagePlaygroundClient({ initialUser }: { initialUser: SessionUser }) {
+export default function ImagePlaygroundClient({
+    initialUser,
+    promptTemplates,
+    promptTemplateScenes
+}: {
+    initialUser: SessionUser;
+    promptTemplates: Array<PromptTemplate & { imageUrl: string }>;
+    promptTemplateScenes: PromptTemplateScene[];
+}) {
     const [mode, setMode] = React.useState<'generate' | 'edit'>('generate');
     const [isCreatingJob, setIsCreatingJob] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
@@ -355,8 +363,8 @@ export default function ImagePlaygroundClient({ initialUser }: { initialUser: Se
             </div>
             <div className='mt-8 w-full'>
                 <PromptTemplateGallery
-                    templates={PROMPT_TEMPLATES}
-                    scenes={PROMPT_TEMPLATE_SCENES}
+                    templates={promptTemplates}
+                    scenes={promptTemplateScenes}
                     onImportPrompt={handleImportPromptTemplate}
                 />
             </div>

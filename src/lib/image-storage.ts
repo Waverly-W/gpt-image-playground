@@ -18,6 +18,7 @@ export type R2Config = {
     secretAccessKey: string;
     bucket: string;
     endpoint: string;
+    publicBaseUrl: string;
 };
 
 export function resolveImageStorageMode(): ImageStorageMode {
@@ -62,13 +63,15 @@ export function getR2ConfigFromRuntimeConfig(runtimeConfig: RuntimeConfig): R2Co
     }
 
     const endpoint = runtimeConfig.r2Endpoint.trim() || `https://${values.accountId}.r2.cloudflarestorage.com`;
+    const publicBaseUrl = runtimeConfig.r2PublicBaseUrl.trim().replace(/\/+$/, '');
 
     return {
         accountId: values.accountId!,
         accessKeyId: values.accessKeyId!,
         secretAccessKey: values.secretAccessKey!,
         bucket: values.bucket!,
-        endpoint
+        endpoint,
+        publicBaseUrl
     };
 }
 
@@ -107,6 +110,15 @@ export async function putR2Image(filename: string, body: Buffer, contentType?: s
             ContentType: contentType || lookup(filename) || 'application/octet-stream'
         })
     );
+}
+
+export function getR2PublicUrl(key: string, runtimeConfig: RuntimeConfig = getRuntimeConfig()): string | null {
+    const publicBaseUrl = runtimeConfig.r2PublicBaseUrl.trim().replace(/\/+$/, '');
+    if (!publicBaseUrl) {
+        return null;
+    }
+
+    return `${publicBaseUrl}/${key.replace(/^\/+/, '')}`;
 }
 
 async function readBody(output: GetObjectCommandOutput): Promise<Buffer> {

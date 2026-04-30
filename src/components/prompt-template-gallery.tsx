@@ -5,13 +5,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { PromptTemplate, PromptTemplateScene } from '@/lib/prompt-templates';
+import type { PromptTemplate, PromptTemplateScene } from '@/lib/prompt-template-data';
 import { ImagePlus, Search, WandSparkles } from 'lucide-react';
 import Image from 'next/image';
 import * as React from 'react';
 
 type PromptTemplateGalleryProps = {
-    templates: PromptTemplate[];
+    templates: Array<PromptTemplate & { imageUrl: string }>;
     scenes: PromptTemplateScene[];
     onImportPrompt: (prompt: string) => void;
 };

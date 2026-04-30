@@ -9,6 +9,7 @@ const R2_ACCESS_KEY_ID_KEY = 'r2_access_key_id';
 const R2_SECRET_ACCESS_KEY_KEY = 'r2_secret_access_key';
 const R2_BUCKET_KEY = 'r2_bucket';
 const R2_ENDPOINT_KEY = 'r2_endpoint';
+const R2_PUBLIC_BASE_URL_KEY = 'r2_public_base_url';
 const AUTH_COOKIE_SECURE_KEY = 'auth_cookie_secure';
 
 export type ImageStorageMode = 'fs' | 'indexeddb' | 'r2';
@@ -22,6 +23,7 @@ export type RuntimeConfig = {
     r2SecretAccessKey: string;
     r2Bucket: string;
     r2Endpoint: string;
+    r2PublicBaseUrl: string;
     authCookieSecure: 'auto' | 'true' | 'false';
     registrationEnabled: boolean;
 };
@@ -90,6 +92,7 @@ export function getRuntimeConfig(): RuntimeConfig {
         r2SecretAccessKey: getDbSettingOrEnv(R2_SECRET_ACCESS_KEY_KEY, ['CLOUDFLARE_R2_SECRET_ACCESS_KEY']),
         r2Bucket: getDbSettingOrEnv(R2_BUCKET_KEY, ['CLOUDFLARE_R2_BUCKET']),
         r2Endpoint: getDbSettingOrEnv(R2_ENDPOINT_KEY, ['CLOUDFLARE_R2_ENDPOINT']),
+        r2PublicBaseUrl: getDbSettingOrEnv(R2_PUBLIC_BASE_URL_KEY, ['CLOUDFLARE_R2_PUBLIC_BASE_URL']),
         authCookieSecure:
             authCookieSecure === 'true' || authCookieSecure === 'false' || authCookieSecure === 'auto'
                 ? authCookieSecure
@@ -106,6 +109,7 @@ export function setRuntimeConfig(config: RuntimeConfigPatch): void {
     setOptionalSetting(R2_SECRET_ACCESS_KEY_KEY, config.r2SecretAccessKey);
     setOptionalSetting(R2_BUCKET_KEY, config.r2Bucket);
     setOptionalSetting(R2_ENDPOINT_KEY, config.r2Endpoint);
+    setOptionalSetting(R2_PUBLIC_BASE_URL_KEY, config.r2PublicBaseUrl);
 
     if (
         config.imageStorageMode === 'fs' ||

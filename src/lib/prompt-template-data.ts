@@ -23,7 +23,6 @@ export type PromptTemplate = {
     prompt: string;
     imageAlt: string;
     imageFilename: string;
-    imageUrl: string;
     aspectRatio: string | null;
     editableVariables: string[];
 };
@@ -68,7 +67,6 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = rawPromptTemplates.map((templa
         prompt: template.prompt,
         imageAlt: template.imageAlt || template.title,
         imageFilename,
-        imageUrl: `/api/prompt-template-images/${imageFilename}`,
         aspectRatio: typeof defaultOptions.aspect_ratio === 'string' ? defaultOptions.aspect_ratio : null,
         editableVariables: toStringArray(metadata.editableVariables)
     };
