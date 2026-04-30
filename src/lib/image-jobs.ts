@@ -129,15 +129,14 @@ export function createImageJob(input: CreateImageJobInput): ImageJob {
     return getImageJobById(id);
 }
 
-export function markImageJobRunning(id: string): ImageJob {
-    const now = nowIso();
+export function markImageJobRunning(id: string, startedAt = nowIso()): ImageJob {
     getDb()
         .prepare(
             `UPDATE image_jobs
              SET status = 'running', updated_at = ?, started_at = COALESCE(started_at, ?), error = NULL
              WHERE id = ?`
         )
-        .run(now, now, id);
+        .run(startedAt, startedAt, id);
 
     return getImageJobById(id);
 }
@@ -204,4 +203,44 @@ export function listImageJobsForUser(ownerUserId: string, limit = 100): ImageJob
 export function deleteImageJobsForUser(ownerUserId: string): number {
     const result = getDb().prepare('DELETE FROM image_jobs WHERE owner_user_id = ?').run(ownerUserId);
     return result.changes;
+}
+
+export function countRunningImageJobs(): number {
+    const row = getDb().prepare("SELECT COUNT(*) AS count FROM image_jobs WHERE status = 'running'").get() as
+        | { count: number }
+        | undefined;
+    return row?.count ?? 0;
+}
+
+export function listPendingImageJobs(limit: number): ImageJob[] {
+    const rows = getDb()
+        .prepare("SELECT * FROM image_jobs WHERE status = 'pending' ORDER BY created_at ASC LIMIT ?")
+        .all(limit) as ImageJobRow[];
+
+    return rows.map(toImageJob);
+}
+
+export function failStaleRunningImageJobs(timeoutMs: number, now = nowIso()): ImageJob[] {
+    const cutoff = new Date(new Date(now).getTime() - timeoutMs).toISOString();
+    const rows = getDb()
+        .prepare("SELECT * FROM image_jobs WHERE status = 'running' AND started_at <= ? ORDER BY started_at ASC")
+        .all(cutoff) as ImageJobRow[];
+
+    if (rows.length === 0) return [];
+
+    const failedAt = now;
+    const update = getDb().prepare(
+        `UPDATE image_jobs
+         SET status = 'failed',
+             error = 'Image generation timed out after 5 minutes.',
+             updated_at = ?,
+             finished_at = ?
+         WHERE id = ? AND status = 'running'`
+    );
+
+    getDb().transaction((jobs: ImageJobRow[]) => {
+        jobs.forEach((job) => update.run(failedAt, failedAt, job.id));
+    })(rows);
+
+    return rows.map((row) => getImageJobById(row.id));
 }

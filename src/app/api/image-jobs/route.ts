@@ -1,15 +1,24 @@
 import { calculateApiCost, type GptImageModel } from '@/lib/cost-utils';
 import {
     createImageJob,
+    countRunningImageJobs,
     deleteImageJobsForUser,
     failImageJob,
+    failStaleRunningImageJobs,
     listImageJobsForUser,
+    listPendingImageJobs,
     markImageJobRunning,
     completeImageJob
 } from '@/lib/image-jobs';
 import { runImageGeneration } from '@/lib/image-generation-service';
 import { authErrorResponse, requireSession } from '@/lib/server-auth';
 import { NextRequest, NextResponse } from 'next/server';
+
+const MAX_PARALLEL_IMAGE_JOBS = 5;
+const IMAGE_JOB_TIMEOUT_MS = 5 * 60 * 1000;
+
+const queuedJobPayloads = new Map<string, { ownerUserId: string; formData: FormData; model: GptImageModel }>();
+const activeJobIds = new Set<string>();
 
 function serializeJobParams(formData: FormData): Record<string, unknown> {
     const params: Record<string, unknown> = {};
@@ -36,6 +45,7 @@ function getErrorStatus(error: unknown): number {
 async function runJobInBackground(jobId: string, ownerUserId: string, formData: FormData, model: GptImageModel) {
     const startTime = Date.now();
     try {
+        activeJobIds.add(jobId);
         markImageJobRunning(jobId);
         const result = await runImageGeneration(formData, ownerUserId);
         const costDetails = calculateApiCost(result.usage, model);
@@ -53,12 +63,35 @@ async function runJobInBackground(jobId: string, ownerUserId: string, formData: 
         });
     } catch (error) {
         failImageJob(jobId, error instanceof Error ? error.message : 'Image generation failed.');
+    } finally {
+        activeJobIds.delete(jobId);
+        queuedJobPayloads.delete(jobId);
+        scheduleImageJobs();
     }
+}
+
+function scheduleImageJobs() {
+    failStaleRunningImageJobs(IMAGE_JOB_TIMEOUT_MS);
+
+    const availableSlots = MAX_PARALLEL_IMAGE_JOBS - countRunningImageJobs();
+    if (availableSlots <= 0) return;
+
+    const jobsToStart = listPendingImageJobs(100)
+        .filter((job) => queuedJobPayloads.has(job.id))
+        .slice(0, availableSlots);
+
+    jobsToStart.forEach((job) => {
+        const payload = queuedJobPayloads.get(job.id);
+        if (!payload || activeJobIds.has(job.id)) return;
+        void runJobInBackground(job.id, payload.ownerUserId, payload.formData, payload.model);
+    });
 }
 
 export async function GET() {
     try {
         const session = await requireSession();
+        failStaleRunningImageJobs(IMAGE_JOB_TIMEOUT_MS);
+        scheduleImageJobs();
         return NextResponse.json({ jobs: listImageJobsForUser(session.id) });
     } catch (error) {
         return authErrorResponse(error) ?? NextResponse.json({ error: 'Failed to list image jobs.' }, { status: 500 });
@@ -91,7 +124,8 @@ export async function POST(request: NextRequest) {
             params: serializeJobParams(formData)
         });
 
-        void runJobInBackground(job.id, session.id, formData, model);
+        queuedJobPayloads.set(job.id, { ownerUserId: session.id, formData, model });
+        scheduleImageJobs();
 
         return NextResponse.json({ job }, { status: 202 });
     } catch (error) {

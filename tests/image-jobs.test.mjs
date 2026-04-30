@@ -141,3 +141,62 @@ test('clears image job records for one owner without deleting other users jobs',
     assert.equal(jobs.getImageJobForUser(first.id, 'usr_clear_1'), null);
     assert.equal(jobs.getImageJobForUser(second.id, 'usr_clear_2')?.id, second.id);
 });
+
+test('lists pending jobs up to remaining parallel capacity', () => {
+    const owner = `usr_capacity_${Date.now()}`;
+    const created = [];
+    for (let index = 0; index < 7; index++) {
+        created.push(
+            jobs.createImageJob({
+                ownerUserId: owner,
+                mode: 'generate',
+                prompt: `capacity ${index}`,
+                model: 'gpt-image-2',
+                params: {}
+            })
+        );
+    }
+
+    jobs.markImageJobRunning(created[0].id);
+    jobs.markImageJobRunning(created[1].id);
+
+    assert.equal(jobs.countRunningImageJobs(), 2);
+    assert.deepEqual(
+        jobs
+            .listPendingImageJobs(100)
+            .filter((job) => job.ownerUserId === owner)
+            .slice(0, 3)
+            .map((job) => job.id),
+        created.slice(2, 5).map((job) => job.id)
+    );
+});
+
+test('marks only stale running jobs as failed after the timeout window', () => {
+    const owner = `usr_timeout_${Date.now()}`;
+    const stale = jobs.createImageJob({
+        ownerUserId: owner,
+        mode: 'generate',
+        prompt: 'stale job',
+        model: 'gpt-image-2',
+        params: {}
+    });
+    const fresh = jobs.createImageJob({
+        ownerUserId: owner,
+        mode: 'generate',
+        prompt: 'fresh job',
+        model: 'gpt-image-2',
+        params: {}
+    });
+
+    jobs.markImageJobRunning(stale.id, '2026-04-30T00:00:00.000Z');
+    jobs.markImageJobRunning(fresh.id, '2026-04-30T00:04:30.000Z');
+
+    const failed = jobs.failStaleRunningImageJobs(5 * 60 * 1000, '2026-04-30T00:05:01.000Z');
+
+    assert.deepEqual(
+        failed.map((job) => job.id),
+        [stale.id]
+    );
+    assert.equal(jobs.getImageJobForUser(stale.id, owner)?.status, 'failed');
+    assert.equal(jobs.getImageJobForUser(fresh.id, owner)?.status, 'running');
+});
