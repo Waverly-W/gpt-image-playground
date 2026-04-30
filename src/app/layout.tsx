@@ -17,9 +17,9 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang='zh-CN' suppressHydrationWarning>
+        <html lang='zh-CN' className='dark' suppressHydrationWarning>
             <body className='antialiased'>
-                <ThemeProvider attribute='class' defaultTheme='dark' enableSystem={false} disableTransitionOnChange>
+                <ThemeProvider>
                     {children}
                     <div
                         data-testid='app-version-badge'

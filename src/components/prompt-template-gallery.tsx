@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { PromptTemplate, PromptTemplateScene } from '@/lib/prompt-template-data';
 import { ImagePlus, Search, WandSparkles } from 'lucide-react';
-import Image from 'next/image';
 import * as React from 'react';
 
 type PromptTemplateGalleryProps = {
@@ -99,11 +98,10 @@ export function PromptTemplateGallery({ templates, scenes, onImportPrompt }: Pro
                             key={template.id}
                             className='overflow-hidden rounded-lg border border-white/10 bg-zinc-950 text-white'>
                             <div className='aspect-[4/3] overflow-hidden bg-white/5'>
-                                <Image
+                                {/* eslint-disable-next-line @next/next/no-img-element -- Template URLs come from runtime R2 config. */}
+                                <img
                                     src={template.imageUrl}
                                     alt={template.imageAlt}
-                                    width={640}
-                                    height={480}
                                     loading='lazy'
                                     className='h-full w-full object-cover'
                                 />
