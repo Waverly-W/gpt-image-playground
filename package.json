@@ -1,6 +1,6 @@
 {
   "name": "gpt-image-playground",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "prepare": "node scripts/install-git-hooks.mjs",
     "test": "tsx --test tests/*.test.mjs"
   },
   "dependencies": {
