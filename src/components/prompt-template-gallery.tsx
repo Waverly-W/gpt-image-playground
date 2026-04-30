@@ -35,7 +35,7 @@ export function PromptTemplateGallery({ templates, scenes, onImportPrompt }: Pro
     }, [normalizedQuery, sceneSlug, templates]);
 
     return (
-        <section className='w-full max-w-screen-2xl space-y-4' aria-labelledby='prompt-template-gallery-title'>
+        <section className='w-full space-y-4' aria-labelledby='prompt-template-gallery-title'>
             <div className='flex flex-col gap-4 border-t border-white/10 pt-6 md:flex-row md:items-end md:justify-between'>
                 <div className='space-y-1'>
                     <div className='flex items-center gap-2 text-white/70'>
@@ -128,7 +128,7 @@ export function PromptTemplateGallery({ templates, scenes, onImportPrompt }: Pro
                     </div>
 
                     {filteredTemplates.length > 0 ? (
-                        <div className='grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4'>
+                        <div className='grid grid-cols-[repeat(auto-fit,minmax(min(100%,14rem),1fr))] gap-4'>
                             {filteredTemplates.map((template) => (
                                 <Card
                                     key={template.id}

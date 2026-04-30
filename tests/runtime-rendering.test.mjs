@@ -30,8 +30,10 @@ test('prompt template gallery uses Ant Design image preview', () => {
 });
 
 test('prompt template gallery card grid adapts to available width', () => {
-    assert.match(promptTemplateGallery, /repeat\(auto-fit,minmax\(min\(100%,18rem\),1fr\)\)/);
+    assert.match(promptTemplateGallery, /<section className='w-full space-y-4'/);
+    assert.match(promptTemplateGallery, /repeat\(auto-fit,minmax\(min\(100%,14rem\),1fr\)\)/);
     assert.doesNotMatch(promptTemplateGallery, /sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4/);
+    assert.doesNotMatch(promptTemplateGallery, /max-w-screen-2xl/);
 });
 
 test('task queue image preview uses Ant Design preview group', () => {
