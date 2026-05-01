@@ -11,7 +11,6 @@ import type { PromptTemplate, PromptTemplateScene } from '@/lib/prompt-template-
 import { getPresetDimensions } from '@/lib/size-utils';
 import {
     Images,
-    LayoutDashboard,
     LogOut,
     Menu,
     PanelLeftClose,
@@ -283,8 +282,7 @@ export default function ImagePlaygroundClient({
         <div className='flex h-full flex-col bg-neutral-950 text-white'>
             <div className='flex min-h-16 items-center justify-between gap-3 border-b border-white/10 px-4'>
                 <div className={`min-w-0 ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
-                    <p className='text-xs font-medium tracking-normal text-white/45 uppercase'>GPT Image</p>
-                    <p className='truncate text-sm font-semibold text-white'>Playground</p>
+                    <p className='truncate text-lg font-semibold text-white'>Imgen</p>
                 </div>
                 <button
                     type='button'
@@ -391,10 +389,6 @@ export default function ImagePlaygroundClient({
                             <Menu className='h-5 w-5' />
                         </button>
                         <div className='min-w-0'>
-                            <p className='flex items-center gap-2 text-xs text-white/45'>
-                                <LayoutDashboard className='h-3.5 w-3.5' aria-hidden='true' />
-                                固定侧边栏布局
-                            </p>
                             <h1 className='truncate text-lg font-semibold text-white'>
                                 {activeSection === 'generate' ? '图片生成' : '提示词画廊'}
                             </h1>
