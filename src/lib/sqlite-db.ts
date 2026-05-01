@@ -49,6 +49,7 @@ function migrate(database: Database.Database) {
             model TEXT NOT NULL,
             params_json TEXT NOT NULL,
             images_json TEXT NOT NULL DEFAULT '[]',
+            preview_image_json TEXT,
             usage_json TEXT,
             cost_json TEXT,
             storage_mode_used TEXT,
@@ -63,6 +64,11 @@ function migrate(database: Database.Database) {
         CREATE INDEX IF NOT EXISTS idx_image_jobs_owner_updated
             ON image_jobs (owner_user_id, updated_at DESC);
     `);
+
+    const imageJobColumns = database.prepare('PRAGMA table_info(image_jobs)').all() as Array<{ name: string }>;
+    if (!imageJobColumns.some((column) => column.name === 'preview_image_json')) {
+        database.exec('ALTER TABLE image_jobs ADD COLUMN preview_image_json TEXT;');
+    }
 }
 
 export function getDb(): Database.Database {

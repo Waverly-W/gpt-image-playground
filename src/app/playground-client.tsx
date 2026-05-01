@@ -193,6 +193,10 @@ export default function ImagePlaygroundClient({
             }
             apiFormData.append('background', genBackground);
             apiFormData.append('moderation', genModeration);
+            if (enableStreaming && genN[0] === 1) {
+                apiFormData.append('stream', 'true');
+                apiFormData.append('partial_images', partialImages.toString());
+            }
             return apiFormData;
         }
 
@@ -211,6 +215,10 @@ export default function ImagePlaygroundClient({
         });
         if (editGeneratedMaskFile) {
             apiFormData.append('mask', editGeneratedMaskFile, editGeneratedMaskFile.name);
+        }
+        if (enableStreaming && editN[0] === 1) {
+            apiFormData.append('stream', 'true');
+            apiFormData.append('partial_images', partialImages.toString());
         }
 
         return apiFormData;

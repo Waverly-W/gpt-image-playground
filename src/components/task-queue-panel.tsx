@@ -15,6 +15,12 @@ export type QueueImageJob = {
     model: GptImageModel;
     params: Record<string, unknown>;
     images: Array<{ filename: string; path?: string; output_format?: string }>;
+    previewImage: {
+        b64_json: string;
+        partial_image_index: number;
+        output_format?: string;
+        updatedAt: string;
+    } | null;
     storageModeUsed: 'fs' | 'indexeddb' | 'r2' | null;
     durationMs: number | null;
     costDetails: CostDetails | null;
@@ -67,6 +73,11 @@ function imageSrc(image: QueueImageJob['images'][number]): string {
     return image.path ?? `/api/image/${image.filename}`;
 }
 
+function previewImageSrc(previewImage: NonNullable<QueueImageJob['previewImage']>): string {
+    const format = previewImage.output_format === 'jpeg' ? 'jpeg' : (previewImage.output_format ?? 'png');
+    return `data:image/${format};base64,${previewImage.b64_json}`;
+}
+
 function TaskStatusBadge({ status }: { status: QueueImageJob['status'] }) {
     const meta = statusMeta[status];
     const Icon = meta.Icon;
@@ -112,6 +123,27 @@ function JobPreview({ job }: { job: QueueImageJob }) {
                     )}
                 </div>
             </AntImage.PreviewGroup>
+        );
+    }
+
+    if ((job.status === 'running' || job.status === 'failed') && job.previewImage) {
+        return (
+            <div className='relative aspect-square w-24 shrink-0 overflow-hidden rounded-md border border-white/15 bg-neutral-900 focus-within:ring-2 focus-within:ring-white focus-within:ring-offset-2 focus-within:ring-offset-black'>
+                <AntImage
+                    src={previewImageSrc(job.previewImage)}
+                    alt={job.status === 'failed' ? '任务失败前预览图' : '任务流式预览图'}
+                    width='100%'
+                    height='100%'
+                    rootClassName='block h-full w-full'
+                    className='h-full w-full object-cover'
+                    preview={{
+                        mask: job.status === 'failed' ? '查看最后预览' : '查看预览'
+                    }}
+                />
+                <span className='pointer-events-none absolute right-1 bottom-1 rounded bg-black/75 px-1.5 py-0.5 text-xs text-white'>
+                    预览
+                </span>
+            </div>
         );
     }
 

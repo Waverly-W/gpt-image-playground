@@ -108,6 +108,63 @@ test('transitions image jobs through running completed and failed states', () =>
     assert.ok(failed.finishedAt);
 });
 
+test('stores latest streaming preview and clears it only after completion', () => {
+    const job = jobs.createImageJob({
+        ownerUserId: 'usr_preview',
+        mode: 'generate',
+        prompt: 'preview test',
+        model: 'gpt-image-2',
+        params: { stream: true, partial_images: 2 }
+    });
+
+    assert.equal(job.previewImage, null);
+
+    const firstPreview = jobs.updateImageJobPreview(job.id, {
+        b64_json: 'first-preview',
+        partial_image_index: 0,
+        output_format: 'png'
+    });
+    assert.deepEqual(firstPreview.previewImage, {
+        b64_json: 'first-preview',
+        partial_image_index: 0,
+        output_format: 'png',
+        updatedAt: firstPreview.previewImage.updatedAt
+    });
+    assert.ok(firstPreview.previewImage.updatedAt);
+
+    const latestPreview = jobs.updateImageJobPreview(job.id, {
+        b64_json: 'latest-preview',
+        partial_image_index: 1,
+        output_format: 'png'
+    });
+    assert.equal(latestPreview.previewImage.b64_json, 'latest-preview');
+    assert.equal(latestPreview.previewImage.partial_image_index, 1);
+
+    const failedJob = jobs.createImageJob({
+        ownerUserId: 'usr_preview',
+        mode: 'generate',
+        prompt: 'failed preview test',
+        model: 'gpt-image-2',
+        params: { stream: true }
+    });
+    jobs.updateImageJobPreview(failedJob.id, {
+        b64_json: 'failed-preview',
+        partial_image_index: 0,
+        output_format: 'png'
+    });
+    const failed = jobs.failImageJob(failedJob.id, 'OpenAI failed after preview');
+    assert.equal(failed.previewImage.b64_json, 'failed-preview');
+
+    const completed = jobs.completeImageJob(job.id, {
+        storageModeUsed: 'fs',
+        durationMs: 900,
+        images: [{ filename: 'final.png', output_format: 'png', path: '/api/image/final.png' }],
+        usage: { output_tokens: 10 },
+        costDetails: null
+    });
+    assert.equal(completed.previewImage, null);
+});
+
 test('returns null when fetching a job with the wrong owner', () => {
     const job = jobs.createImageJob({
         ownerUserId: 'usr_owner',

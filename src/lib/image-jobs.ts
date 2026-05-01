@@ -12,6 +12,13 @@ export type ImageJobImage = {
     path?: string;
 };
 
+export type ImageJobPreviewImage = {
+    b64_json: string;
+    partial_image_index: number;
+    output_format?: string;
+    updatedAt: string;
+};
+
 export type ImageJob = {
     id: string;
     ownerUserId: string;
@@ -21,6 +28,7 @@ export type ImageJob = {
     model: GptImageModel;
     params: Record<string, unknown>;
     images: ImageJobImage[];
+    previewImage: ImageJobPreviewImage | null;
     usage: unknown | null;
     costDetails: CostDetails | null;
     storageModeUsed: ImageStorageMode | null;
@@ -41,6 +49,7 @@ type ImageJobRow = {
     model: GptImageModel;
     params_json: string;
     images_json: string;
+    preview_image_json: string | null;
     usage_json: string | null;
     cost_json: string | null;
     storage_mode_used: ImageStorageMode | null;
@@ -68,6 +77,8 @@ type CompleteImageJobInput = {
     durationMs: number;
 };
 
+type UpdateImageJobPreviewInput = Omit<ImageJobPreviewImage, 'updatedAt'>;
+
 function nowIso(): string {
     return new Date().toISOString();
 }
@@ -91,6 +102,7 @@ function toImageJob(row: ImageJobRow): ImageJob {
         model: row.model,
         params: parseJson<Record<string, unknown>>(row.params_json, {}),
         images: parseJson<ImageJobImage[]>(row.images_json, []),
+        previewImage: parseJson<ImageJobPreviewImage | null>(row.preview_image_json, null),
         usage: parseJson<unknown | null>(row.usage_json, null),
         costDetails: parseJson<CostDetails | null>(row.cost_json, null),
         storageModeUsed: row.storage_mode_used,
@@ -152,6 +164,7 @@ export function completeImageJob(id: string, input: CompleteImageJobInput): Imag
                  cost_json = ?,
                  storage_mode_used = ?,
                  duration_ms = ?,
+                 preview_image_json = NULL,
                  error = NULL,
                  updated_at = ?,
                  finished_at = ?
@@ -167,6 +180,24 @@ export function completeImageJob(id: string, input: CompleteImageJobInput): Imag
             now,
             id
         );
+
+    return getImageJobById(id);
+}
+
+export function updateImageJobPreview(id: string, input: UpdateImageJobPreviewInput): ImageJob {
+    const now = nowIso();
+    const previewImage: ImageJobPreviewImage = {
+        ...input,
+        updatedAt: now
+    };
+
+    getDb()
+        .prepare(
+            `UPDATE image_jobs
+             SET preview_image_json = ?, updated_at = ?
+             WHERE id = ?`
+        )
+        .run(JSON.stringify(previewImage), now, id);
 
     return getImageJobById(id);
 }

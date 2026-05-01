@@ -8,9 +8,10 @@ import {
     listImageJobsForUser,
     listPendingImageJobs,
     markImageJobRunning,
-    completeImageJob
+    completeImageJob,
+    updateImageJobPreview
 } from '@/lib/image-jobs';
-import { runImageGeneration } from '@/lib/image-generation-service';
+import { runImageGeneration, runStreamingImageGeneration } from '@/lib/image-generation-service';
 import { authErrorResponse, requireSession } from '@/lib/server-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -47,7 +48,14 @@ async function runJobInBackground(jobId: string, ownerUserId: string, formData: 
     try {
         activeJobIds.add(jobId);
         markImageJobRunning(jobId);
-        const result = await runImageGeneration(formData, ownerUserId);
+        const streamEnabled = formData.get('stream') === 'true';
+        const n = parseInt((formData.get('n') as string) || '1', 10);
+        const result =
+            streamEnabled && n === 1
+                ? await runStreamingImageGeneration(formData, ownerUserId, (preview) => {
+                      updateImageJobPreview(jobId, preview);
+                  })
+                : await runImageGeneration(formData, ownerUserId);
         const costDetails = calculateApiCost(result.usage, model);
 
         completeImageJob(jobId, {

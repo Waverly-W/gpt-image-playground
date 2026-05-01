@@ -10,6 +10,7 @@ const modeToggle = fs.readFileSync(new URL('../src/components/mode-toggle.tsx', 
 const themeProvider = fs.readFileSync(new URL('../src/components/theme-provider.tsx', import.meta.url), 'utf8');
 const rootLayout = fs.readFileSync(new URL('../src/app/layout.tsx', import.meta.url), 'utf8');
 const nextConfig = fs.readFileSync(new URL('../next.config.ts', import.meta.url), 'utf8');
+const playgroundClient = fs.readFileSync(new URL('../src/app/playground-client.tsx', import.meta.url), 'utf8');
 
 test('prompt template gallery uses the configured R2 image host', () => {
     assert.match(promptTemplateGallery, /from 'antd'/);
@@ -42,6 +43,22 @@ test('task queue image preview uses Ant Design preview group', () => {
     assert.match(taskQueuePanel, /import \{ Image as AntImage \} from 'antd'/);
     assert.match(taskQueuePanel, /<AntImage\.PreviewGroup/);
     assert.doesNotMatch(taskQueuePanel, /DialogContent/);
+});
+
+test('task queue renders clickable streaming preview images', () => {
+    const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
+
+    assert.match(taskQueuePanel, /previewImageSrc/);
+    assert.match(taskQueuePanel, /job\.previewImage/);
+    assert.match(taskQueuePanel, /mask: job\.status === 'failed' \? '查看最后预览' : '查看预览'/);
+    assert.match(taskQueuePanel, /预览/);
+});
+
+test('playground submits streaming settings to queued image jobs', () => {
+    assert.match(playgroundClient, /apiFormData\.append\('stream', 'true'\)/);
+    assert.match(playgroundClient, /apiFormData\.append\('partial_images', partialImages\.toString\(\)\)/);
+    assert.match(playgroundClient, /enableStreaming && genN\[0\] === 1/);
+    assert.match(playgroundClient, /enableStreaming && editN\[0\] === 1/);
 });
 
 test('mode toggle renders as a prominent sliding tab control', () => {
