@@ -6,19 +6,11 @@ import { PromptTemplateGallery } from '@/components/prompt-template-gallery';
 import { TaskQueuePanel, type QueueImageJob } from '@/components/task-queue-panel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { type SessionUser } from '@/lib/auth';
+import { createBatchJobFormData, type BatchGenerationRow } from '@/lib/batch-csv';
 import type { CostDetails, GptImageModel } from '@/lib/cost-utils';
 import type { PromptTemplate, PromptTemplateScene } from '@/lib/prompt-template-data';
 import { getPresetDimensions } from '@/lib/size-utils';
-import {
-    Images,
-    LogOut,
-    Menu,
-    PanelLeftClose,
-    PanelLeftOpen,
-    Shield,
-    WandSparkles,
-    X
-} from 'lucide-react';
+import { Images, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Shield, WandSparkles, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -67,6 +59,7 @@ export default function ImagePlaygroundClient({
     const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
     const [isCreatingJob, setIsCreatingJob] = React.useState(false);
+    const [batchProgress, setBatchProgress] = React.useState<string | null>(null);
     const [error, setError] = React.useState<string | null>(null);
     const [jobs, setJobs] = React.useState<QueueImageJob[]>([]);
     const formPanelRef = React.useRef<HTMLDivElement>(null);
@@ -249,6 +242,58 @@ export default function ImagePlaygroundClient({
         }
     };
 
+    const waitForBatchJobToFinish = async (jobId: string) => {
+        while (true) {
+            await new Promise((resolve) => window.setTimeout(resolve, 2000));
+            const response = await fetch(`/api/image-jobs/${jobId}`);
+            const result = (await response.json()) as { job?: QueueImageJob; error?: string };
+
+            if (!response.ok || !result.job) {
+                throw new Error(result.error || `任务状态查询失败，状态码 ${response.status}`);
+            }
+
+            setJobs((prev) => [result.job!, ...prev.filter((job) => job.id !== result.job!.id)]);
+            if (result.job.status === 'completed' || result.job.status === 'failed') {
+                return result.job;
+            }
+        }
+    };
+
+    const handleBatchApiCall = async (rows: BatchGenerationRow[]) => {
+        setIsCreatingJob(true);
+        setError(null);
+
+        try {
+            for (let index = 0; index < rows.length; index++) {
+                const row = rows[index];
+                setBatchProgress(`正在创建第 ${index + 1} / ${rows.length} 个批量任务`);
+                const response = await fetch('/api/image-jobs', {
+                    method: 'POST',
+                    body: createBatchJobFormData(row)
+                });
+                const result = (await response.json()) as { job?: QueueImageJob; error?: string };
+
+                if (!response.ok || !result.job) {
+                    throw new Error(result.error || `第 ${index + 1} 个任务创建失败，状态码 ${response.status}`);
+                }
+
+                setJobs((prev) => [result.job!, ...prev.filter((job) => job.id !== result.job!.id)]);
+                void loadJobs();
+                setBatchProgress(`第 ${index + 1} / ${rows.length} 个任务生成中`);
+                await waitForBatchJobToFinish(result.job.id);
+            }
+
+            setBatchProgress(`已完成 ${rows.length} 个批量任务`);
+            void loadJobs();
+        } catch (batchError) {
+            console.error('Batch job creation error:', batchError);
+            setError(batchError instanceof Error ? batchError.message : '批量任务创建失败。');
+        } finally {
+            setIsCreatingJob(false);
+            window.setTimeout(() => setBatchProgress(null), 3000);
+        }
+    };
+
     const handleClearQueue = React.useCallback(async () => {
         if (!window.confirm('确定清空任务队列吗？这会移除当前用户的任务记录。')) {
             return;
@@ -422,7 +467,9 @@ export default function ImagePlaygroundClient({
                                 <div className={mode === 'generate' ? 'block h-full w-full' : 'hidden'}>
                                     <GenerationForm
                                         onSubmit={handleApiCall}
+                                        onBatchSubmit={handleBatchApiCall}
                                         isLoading={isCreatingJob}
+                                        batchProgress={batchProgress}
                                         currentMode={mode}
                                         onModeChange={setMode}
                                         model={genModel}

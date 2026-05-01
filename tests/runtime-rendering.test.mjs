@@ -61,6 +61,17 @@ test('playground submits streaming settings to queued image jobs', () => {
     assert.match(playgroundClient, /enableStreaming && editN\[0\] === 1/);
 });
 
+test('playground supports CSV batch generation through the existing job queue', () => {
+    const generationForm = fs.readFileSync(new URL('../src/components/generation-form.tsx', import.meta.url), 'utf8');
+
+    assert.match(generationForm, /createBatchCsvTemplate/);
+    assert.match(generationForm, /parseBatchCsv/);
+    assert.match(generationForm, /批量生成/);
+    assert.match(playgroundClient, /createBatchJobFormData/);
+    assert.match(playgroundClient, /handleBatchApiCall/);
+    assert.match(playgroundClient, /waitForBatchJobToFinish/);
+});
+
 test('mode toggle renders as a prominent sliding tab control', () => {
     assert.match(modeToggle, /aria-hidden='true'/);
     assert.match(modeToggle, /translate-x-full/);

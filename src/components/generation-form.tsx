@@ -11,6 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+    createBatchCsvTemplate,
+    parseBatchCsv,
+    type BatchGenerationDefaults,
+    type BatchGenerationRow
+} from '@/lib/batch-csv';
 import type { GptImageModel } from '@/lib/cost-utils';
 import { IMAGE_MODEL_OPTIONS } from '@/lib/image-models';
 import { getPresetTooltip, validateGptImage2Size } from '@/lib/size-utils';
@@ -30,7 +36,10 @@ import {
     Loader2,
     BrickWall,
     HelpCircle,
-    SquareDashed
+    SquareDashed,
+    Download,
+    Upload,
+    ListPlus
 } from 'lucide-react';
 import * as React from 'react';
 
@@ -50,7 +59,9 @@ export type GenerationFormData = {
 
 type GenerationFormProps = {
     onSubmit: (data: GenerationFormData) => void;
+    onBatchSubmit: (rows: BatchGenerationRow[]) => Promise<void>;
     isLoading: boolean;
+    batchProgress: string | null;
     currentMode: 'generate' | 'edit';
     onModeChange: (mode: 'generate' | 'edit') => void;
     model: GenerationFormData['model'];
@@ -107,7 +118,9 @@ const RadioItemWithIcon = ({
 
 export function GenerationForm({
     onSubmit,
+    onBatchSubmit,
     isLoading,
+    batchProgress,
     currentMode,
     onModeChange,
     model,
@@ -142,6 +155,40 @@ export function GenerationForm({
     const customSizeValidation =
         size === 'custom' ? validateGptImage2Size(customWidth, customHeight) : { valid: true as const };
     const customSizeInvalid = size === 'custom' && !customSizeValidation.valid;
+    const batchFileInputRef = React.useRef<HTMLInputElement>(null);
+    const [batchRows, setBatchRows] = React.useState<BatchGenerationRow[]>([]);
+    const [batchErrors, setBatchErrors] = React.useState<string[]>([]);
+
+    const batchDefaults = React.useMemo<BatchGenerationDefaults>(
+        () => ({
+            model,
+            n: n[0],
+            size,
+            customWidth,
+            customHeight,
+            quality,
+            output_format: outputFormat,
+            output_compression: compression[0],
+            background,
+            moderation,
+            stream: enableStreaming && n[0] === 1,
+            partial_images: partialImages
+        }),
+        [
+            model,
+            n,
+            size,
+            customWidth,
+            customHeight,
+            quality,
+            outputFormat,
+            compression,
+            background,
+            moderation,
+            enableStreaming,
+            partialImages
+        ]
+    );
 
     // Disable streaming when n > 1 (OpenAI limitation)
     React.useEffect(() => {
@@ -185,6 +232,35 @@ export function GenerationForm({
             formData.output_compression = compression[0];
         }
         onSubmit(formData);
+    };
+
+    const handleDownloadTemplate = () => {
+        const template = createBatchCsvTemplate(batchDefaults);
+        const blob = new Blob([template], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'image-batch-template.csv';
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleBatchFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const text = await file.text();
+        const result = parseBatchCsv(text, batchDefaults);
+        setBatchRows(result.rows);
+        setBatchErrors(result.errors);
+        event.target.value = '';
+    };
+
+    const handleCreateBatchJobs = async () => {
+        if (batchRows.length === 0 || batchErrors.length > 0) return;
+        await onBatchSubmit(batchRows);
+        setBatchRows([]);
+        setBatchErrors([]);
     };
 
     return (
@@ -302,6 +378,97 @@ export function GenerationForm({
                             </RadioGroup>
                         </div>
                     )}
+
+                    <div className='flex flex-col gap-3 rounded-md border border-white/10 bg-white/[0.03] p-3'>
+                        <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+                            <div className='min-w-0'>
+                                <Label className='text-white'>批量生成</Label>
+                                <p className='mt-1 text-xs leading-5 text-white/50'>
+                                    下载模板后填写提示词和参数，空参数会使用当前表单默认值。
+                                </p>
+                            </div>
+                            <div className='flex flex-wrap gap-2'>
+                                <Button
+                                    type='button'
+                                    variant='ghost'
+                                    size='sm'
+                                    onClick={handleDownloadTemplate}
+                                    disabled={isLoading}
+                                    className='h-9 rounded-md px-2 text-white/70 hover:bg-white/10 hover:text-white'>
+                                    <Download className='mr-1.5 h-4 w-4' />
+                                    下载模板
+                                </Button>
+                                <Button
+                                    type='button'
+                                    variant='ghost'
+                                    size='sm'
+                                    onClick={() => batchFileInputRef.current?.click()}
+                                    disabled={isLoading}
+                                    className='h-9 rounded-md px-2 text-white/70 hover:bg-white/10 hover:text-white'>
+                                    <Upload className='mr-1.5 h-4 w-4' />
+                                    导入 CSV
+                                </Button>
+                            </div>
+                        </div>
+
+                        <input
+                            ref={batchFileInputRef}
+                            type='file'
+                            accept='.csv,text/csv'
+                            onChange={handleBatchFileChange}
+                            className='hidden'
+                            aria-label='导入批量生成 CSV'
+                        />
+
+                        {(batchRows.length > 0 || batchErrors.length > 0 || batchProgress) && (
+                            <div className='flex flex-col gap-2 rounded-md border border-white/10 bg-black p-3 text-sm'>
+                                {batchRows.length > 0 && (
+                                    <div className='flex flex-col gap-2'>
+                                        <div className='flex flex-wrap items-center justify-between gap-2'>
+                                            <span className='text-white/75'>已解析 {batchRows.length} 个任务</span>
+                                            <Button
+                                                type='button'
+                                                size='sm'
+                                                onClick={handleCreateBatchJobs}
+                                                disabled={isLoading || batchErrors.length > 0}
+                                                className='h-9 rounded-md bg-white px-3 text-black hover:bg-white/90 disabled:bg-white/10 disabled:text-white/40'>
+                                                {isLoading ? (
+                                                    <Loader2 className='mr-1.5 h-4 w-4 animate-spin' />
+                                                ) : (
+                                                    <ListPlus className='mr-1.5 h-4 w-4' />
+                                                )}
+                                                创建批量任务
+                                            </Button>
+                                        </div>
+                                        <div className='max-h-24 overflow-y-auto rounded border border-white/10'>
+                                            {batchRows.slice(0, 5).map((row) => (
+                                                <div
+                                                    key={row.line}
+                                                    className='border-b border-white/10 px-2 py-1.5 text-xs text-white/55 last:border-b-0'>
+                                                    第 {row.line} 行 · {row.model} · {row.size} ·{' '}
+                                                    <span className='text-white/75'>{row.prompt}</span>
+                                                </div>
+                                            ))}
+                                            {batchRows.length > 5 && (
+                                                <div className='px-2 py-1.5 text-xs text-white/45'>
+                                                    还有 {batchRows.length - 5} 个任务会按 CSV 顺序创建。
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                {batchProgress && <p className='text-xs text-sky-200'>{batchProgress}</p>}
+                                {batchErrors.length > 0 && (
+                                    <div className='flex flex-col gap-1 text-xs text-red-300'>
+                                        {batchErrors.slice(0, 8).map((error) => (
+                                            <p key={error}>{error}</p>
+                                        ))}
+                                        {batchErrors.length > 8 && <p>还有 {batchErrors.length - 8} 个错误。</p>}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
 
                     <div className='space-y-1.5'>
                         <Label htmlFor='prompt' className='text-white'>
