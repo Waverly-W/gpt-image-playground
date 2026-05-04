@@ -3,7 +3,14 @@
 import { PromptInspector, type PromptInspectorBlock } from '@/components/prompt-inspector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
 import type { CostDetails, GptImageModel } from '@/lib/cost-utils';
+import {
+    IMAGE_QUALITY_FAILURE_REASON_OPTIONS,
+    isImageJobQualityFeedback,
+    type ImageJobQualityFeedback,
+    type ImageQualityFailureReason
+} from '@/lib/image-quality-feedback';
 import { Image as AntImage } from 'antd';
 import { CheckCircle2, Clock3, Cloud, ImageIcon, Layers, Loader2, Trash2, XCircle } from 'lucide-react';
 import * as React from 'react';
@@ -36,7 +43,14 @@ type TaskQueuePanelProps = {
     jobs: QueueImageJob[];
     onClearQueue: () => void;
     onCancelPendingJob: (jobId: string) => void;
+    onUpdateQualityFeedback: (
+        jobId: string,
+        feedback: { failureReasons: ImageQualityFailureReason[]; note: string }
+    ) => Promise<void>;
 };
+
+const QUALITY_FAILURE_REASON_OPTIONS = IMAGE_QUALITY_FAILURE_REASON_OPTIONS;
+const EMPTY_FAILURE_REASONS: ImageQualityFailureReason[] = [];
 
 const statusMeta = {
     pending: {
@@ -119,6 +133,11 @@ function getJobPromptInspectorData(job: QueueImageJob): {
     };
 }
 
+function getJobQualityFeedback(job: QueueImageJob): ImageJobQualityFeedback | null {
+    const feedback = job.params.quality_feedback;
+    return isImageJobQualityFeedback(feedback) ? feedback : null;
+}
+
 function TaskStatusBadge({ status }: { status: QueueImageJob['status'] }) {
     const meta = statusMeta[status];
     const Icon = meta.Icon;
@@ -195,7 +214,104 @@ function JobPreview({ job }: { job: QueueImageJob }) {
     );
 }
 
-export function TaskQueuePanel({ jobs, onClearQueue, onCancelPendingJob }: TaskQueuePanelProps) {
+function QualityFeedbackPanel({
+    job,
+    onUpdateQualityFeedback
+}: {
+    job: QueueImageJob;
+    onUpdateQualityFeedback: TaskQueuePanelProps['onUpdateQualityFeedback'];
+}) {
+    const savedFeedback = getJobQualityFeedback(job);
+    const savedFailureReasons = savedFeedback?.failureReasons ?? EMPTY_FAILURE_REASONS;
+    const savedNote = savedFeedback?.note ?? '';
+    const [selectedReasons, setSelectedReasons] = React.useState<ImageQualityFailureReason[]>(savedFailureReasons);
+    const [note, setNote] = React.useState(savedNote);
+    const [isSaving, setIsSaving] = React.useState(false);
+    const [isDirty, setIsDirty] = React.useState(false);
+
+    React.useEffect(() => {
+        if (isDirty) return;
+
+        setSelectedReasons(savedFailureReasons);
+        setNote(savedNote);
+    }, [isDirty, savedFailureReasons, savedNote]);
+
+    const toggleReason = (reason: ImageQualityFailureReason) => {
+        setIsDirty(true);
+        setSelectedReasons((currentReasons) =>
+            currentReasons.includes(reason)
+                ? currentReasons.filter((currentReason) => currentReason !== reason)
+                : [...currentReasons, reason]
+        );
+    };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            await onUpdateQualityFeedback(job.id, { failureReasons: selectedReasons, note });
+            setIsDirty(false);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className='rounded-md border border-white/10 bg-black/70 p-3'>
+            <div className='mb-2 flex flex-wrap items-center justify-between gap-2'>
+                <div>
+                    <h4 className='text-xs font-medium text-white'>质量反馈</h4>
+                    {savedFeedback?.updatedAt && (
+                        <p className='mt-1 text-xs text-white/40'>已记录：{formatTime(savedFeedback.updatedAt)}</p>
+                    )}
+                </div>
+                <Button
+                    type='button'
+                    size='sm'
+                    variant='ghost'
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className='h-8 rounded-md px-2 text-white/65 hover:bg-white/10 hover:text-white disabled:text-white/35'>
+                    {isSaving ? '保存中...' : '保存反馈'}
+                </Button>
+            </div>
+            <div className='flex flex-wrap gap-1.5'>
+                {QUALITY_FAILURE_REASON_OPTIONS.map((option) => {
+                    const selected = selectedReasons.includes(option.id);
+
+                    return (
+                        <button
+                            key={option.id}
+                            type='button'
+                            onClick={() => toggleReason(option.id)}
+                            className={`rounded border px-2 py-1 text-xs transition-colors ${
+                                selected
+                                    ? 'border-amber-300/50 bg-amber-300/15 text-amber-100'
+                                    : 'border-white/10 text-white/55 hover:border-white/25 hover:text-white'
+                            }`}>
+                            {option.label}
+                        </button>
+                    );
+                })}
+            </div>
+            <Textarea
+                value={note}
+                onChange={(event) => {
+                    setIsDirty(true);
+                    setNote(event.target.value);
+                }}
+                placeholder='补充失败现象，后续用于优化 Prompt Builder。'
+                className='mt-2 min-h-16 rounded-md border border-white/10 bg-neutral-950 text-xs text-white placeholder:text-white/35 focus:border-white/30 focus:ring-white/30'
+            />
+        </div>
+    );
+}
+
+export function TaskQueuePanel({
+    jobs,
+    onClearQueue,
+    onCancelPendingJob,
+    onUpdateQualityFeedback
+}: TaskQueuePanelProps) {
     return (
         <Card className='flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-neutral-950'>
             <CardHeader className='flex flex-row items-center justify-between gap-3 border-b border-white/10 px-4 py-4'>
@@ -285,6 +401,14 @@ export function TaskQueuePanel({ jobs, onClearQueue, onCancelPendingJob }: TaskQ
                                                 warnings={promptInspectorData.warnings}
                                                 defaultOpen={false}
                                                 compact
+                                            />
+                                        </div>
+                                    )}
+                                    {job.status === 'completed' && (
+                                        <div className='sm:pl-[6.75rem]'>
+                                            <QualityFeedbackPanel
+                                                job={job}
+                                                onUpdateQualityFeedback={onUpdateQualityFeedback}
                                             />
                                         </div>
                                     )}

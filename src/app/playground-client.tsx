@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { type SessionUser } from '@/lib/auth';
 import { createBatchJobFormData, type BatchGenerationRow } from '@/lib/batch-csv';
 import type { CostDetails, GptImageModel } from '@/lib/cost-utils';
+import type { ImageQualityFailureReason } from '@/lib/image-quality-feedback';
 import type { PromptTemplate, PromptTemplateScene } from '@/lib/prompt-template-data';
 import { getPresetDimensions } from '@/lib/size-utils';
 import { Images, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Shield, WandSparkles, X } from 'lucide-react';
@@ -309,6 +310,35 @@ export default function ImagePlaygroundClient({
         [loadJobs]
     );
 
+    const handleUpdateQualityFeedback = React.useCallback(
+        async (
+            jobId: string,
+            feedback: { failureReasons: ImageQualityFailureReason[]; note: string }
+        ): Promise<void> => {
+            try {
+                const response = await fetch(`/api/image-jobs/${jobId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(feedback)
+                });
+                const result = (await response.json()) as { job?: QueueImageJob; error?: string };
+
+                if (!response.ok || !result.job) {
+                    throw new Error(result.error || `反馈保存失败，状态码 ${response.status}`);
+                }
+
+                setJobs((prev) => prev.map((job) => (job.id === result.job!.id ? result.job! : job)));
+                setError(null);
+                void loadJobs();
+            } catch (qualityFeedbackError) {
+                console.error('Failed to update quality feedback:', qualityFeedbackError);
+                setError(qualityFeedbackError instanceof Error ? qualityFeedbackError.message : '质量反馈保存失败。');
+                throw qualityFeedbackError;
+            }
+        },
+        [loadJobs]
+    );
+
     const handleClearQueue = React.useCallback(async () => {
         if (!window.confirm('确定清空任务队列吗？这会移除当前用户的任务记录。')) {
             return;
@@ -565,11 +595,12 @@ export default function ImagePlaygroundClient({
                             </div>
 
                             <div data-panel='task-queue' className='min-h-[640px] lg:h-[calc(100dvh-7rem)]'>
-                                <TaskQueuePanel
-                                    jobs={jobs}
-                                    onClearQueue={handleClearQueue}
-                                    onCancelPendingJob={handleCancelPendingJob}
-                                />
+                            <TaskQueuePanel
+                                jobs={jobs}
+                                onClearQueue={handleClearQueue}
+                                onCancelPendingJob={handleCancelPendingJob}
+                                onUpdateQualityFeedback={handleUpdateQualityFeedback}
+                            />
                             </div>
                         </section>
                     ) : (

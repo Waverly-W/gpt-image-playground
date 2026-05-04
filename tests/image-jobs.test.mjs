@@ -162,6 +162,64 @@ test('stores latest streaming preview and clears it only after completion', () =
     assert.equal(completed.previewImage, null);
 });
 
+test('records quality feedback reasons on completed image jobs', () => {
+    const job = jobs.createImageJob({
+        ownerUserId: 'usr_quality',
+        mode: 'generate',
+        prompt: 'quality loop',
+        model: 'gpt-image-2',
+        params: { prompt_mode: 'guided' }
+    });
+
+    jobs.completeImageJob(job.id, {
+        storageModeUsed: 'fs',
+        durationMs: 1200,
+        images: [{ filename: 'quality.png', output_format: 'png', path: '/api/image/quality.png' }],
+        usage: { output_tokens: 10 },
+        costDetails: null
+    });
+
+    const updated = jobs.updateImageJobQualityFeedbackForUser(
+        job.id,
+        'usr_quality',
+        {
+            failureReasons: ['text-error', 'style-error', 'unknown-reason', 'text-error'],
+            note: '中文标题有错，整体风格偏离。'
+        },
+        '2026-05-05T00:00:00.000Z'
+    );
+
+    assert.equal(updated?.params.prompt_mode, 'guided');
+    assert.deepEqual(updated?.params.quality_feedback, {
+        failureReasons: ['text-error', 'style-error'],
+        note: '中文标题有错，整体风格偏离。',
+        updatedAt: '2026-05-05T00:00:00.000Z'
+    });
+    assert.equal(jobs.updateImageJobQualityFeedbackForUser(job.id, 'usr_other', { failureReasons: [] }), null);
+});
+
+test('clears empty quality feedback from image job params', () => {
+    const job = jobs.createImageJob({
+        ownerUserId: 'usr_quality_clear',
+        mode: 'generate',
+        prompt: 'quality clear',
+        model: 'gpt-image-2',
+        params: {}
+    });
+
+    jobs.updateImageJobQualityFeedbackForUser(job.id, 'usr_quality_clear', {
+        failureReasons: ['composition-error'],
+        note: '需要重新构图'
+    });
+
+    const cleared = jobs.updateImageJobQualityFeedbackForUser(job.id, 'usr_quality_clear', {
+        failureReasons: [],
+        note: '   '
+    });
+
+    assert.equal(Object.hasOwn(cleared?.params ?? {}, 'quality_feedback'), false);
+});
+
 test('returns null when fetching a job with the wrong owner', () => {
     const job = jobs.createImageJob({
         ownerUserId: 'usr_owner',

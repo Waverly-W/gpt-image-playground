@@ -1,4 +1,8 @@
 import type { CostDetails, GptImageModel } from './cost-utils';
+import {
+    normalizeQualityFailureReasons,
+    type ImageJobQualityFeedback
+} from './image-quality-feedback';
 import type { ImageStorageMode } from './settings';
 import { getDb } from './sqlite-db';
 import crypto from 'crypto';
@@ -78,6 +82,11 @@ type CompleteImageJobInput = {
 };
 
 type UpdateImageJobPreviewInput = Omit<ImageJobPreviewImage, 'updatedAt'>;
+
+type UpdateImageJobQualityFeedbackInput = {
+    failureReasons: unknown;
+    note?: unknown;
+};
 
 function nowIso(): string {
     return new Date().toISOString();
@@ -198,6 +207,41 @@ export function updateImageJobPreview(id: string, input: UpdateImageJobPreviewIn
              WHERE id = ?`
         )
         .run(JSON.stringify(previewImage), now, id);
+
+    return getImageJobById(id);
+}
+
+export function updateImageJobQualityFeedbackForUser(
+    id: string,
+    ownerUserId: string,
+    input: UpdateImageJobQualityFeedbackInput,
+    updatedAt = nowIso()
+): ImageJob | null {
+    const existing = getImageJobForUser(id, ownerUserId);
+    if (!existing) return null;
+
+    const failureReasons = normalizeQualityFailureReasons(input.failureReasons);
+    const note = typeof input.note === 'string' ? input.note.trim() : '';
+    const params = { ...existing.params };
+
+    if (failureReasons.length === 0 && !note) {
+        delete params.quality_feedback;
+    } else {
+        const feedback: ImageJobQualityFeedback = {
+            failureReasons,
+            ...(note ? { note } : {}),
+            updatedAt
+        };
+        params.quality_feedback = feedback;
+    }
+
+    getDb()
+        .prepare(
+            `UPDATE image_jobs
+             SET params_json = ?, updated_at = ?
+             WHERE id = ? AND owner_user_id = ?`
+        )
+        .run(JSON.stringify(params), updatedAt, id, ownerUserId);
 
     return getImageJobById(id);
 }

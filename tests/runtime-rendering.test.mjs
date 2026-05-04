@@ -60,6 +60,28 @@ test('task queue keeps thumbnails square when prompt inspector expands', () => {
     assert.match(taskQueuePanel, /className='sm:pl-\[6\.75rem\]'/);
 });
 
+test('task queue exposes quality feedback controls for completed jobs', () => {
+    const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
+    const playgroundClient = fs.readFileSync(new URL('../src/app/playground-client.tsx', import.meta.url), 'utf8');
+    const jobRoute = fs.readFileSync(new URL('../src/app/api/image-jobs/[id]/route.ts', import.meta.url), 'utf8');
+    const qualityFeedback = fs.readFileSync(new URL('../src/lib/image-quality-feedback.ts', import.meta.url), 'utf8');
+
+    assert.match(taskQueuePanel, /QUALITY_FAILURE_REASON_OPTIONS/);
+    assert.match(taskQueuePanel, /质量反馈/);
+    assert.match(qualityFeedback, /文字错/);
+    assert.match(qualityFeedback, /构图错/);
+    assert.match(qualityFeedback, /风格错/);
+    assert.match(qualityFeedback, /不听参考图/);
+    assert.match(qualityFeedback, /主体不一致/);
+    assert.match(qualityFeedback, /信息密度不对/);
+    assert.match(taskQueuePanel, /onUpdateQualityFeedback/);
+    assert.match(taskQueuePanel, /job\.status === 'completed'/);
+    assert.match(playgroundClient, /handleUpdateQualityFeedback/);
+    assert.match(playgroundClient, /method: 'PATCH'/);
+    assert.match(jobRoute, /updateImageJobQualityFeedbackForUser/);
+    assert.match(jobRoute, /export async function PATCH/);
+});
+
 test('prompt template gallery uses the configured R2 image host', () => {
     assert.match(promptTemplateGallery, /from 'antd'/);
     assert.match(promptTemplateGallery, /<AntImage/);

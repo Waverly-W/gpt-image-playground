@@ -1,4 +1,4 @@
-import { cancelPendingImageJobForUser, getImageJobForUser } from '@/lib/image-jobs';
+import { cancelPendingImageJobForUser, getImageJobForUser, updateImageJobQualityFeedbackForUser } from '@/lib/image-jobs';
 import { authErrorResponse, requireSession } from '@/lib/server-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -19,6 +19,32 @@ export async function GET(_request: NextRequest, context: RouteContext) {
         return NextResponse.json({ job });
     } catch (error) {
         return authErrorResponse(error) ?? NextResponse.json({ error: 'Failed to load image job.' }, { status: 500 });
+    }
+}
+
+export async function PATCH(request: NextRequest, context: RouteContext) {
+    try {
+        const session = await requireSession();
+        const { id } = await context.params;
+        const body = (await request.json()) as unknown;
+
+        if (!body || typeof body !== 'object') {
+            return NextResponse.json({ error: 'Invalid quality feedback payload.' }, { status: 400 });
+        }
+
+        const payload = body as Record<string, unknown>;
+        const job = updateImageJobQualityFeedbackForUser(id, session.id, {
+            failureReasons: payload.failureReasons,
+            note: payload.note
+        });
+
+        if (!job) {
+            return NextResponse.json({ error: 'Image job not found.' }, { status: 404 });
+        }
+
+        return NextResponse.json({ job });
+    } catch (error) {
+        return authErrorResponse(error) ?? NextResponse.json({ error: 'Failed to update quality feedback.' }, { status: 500 });
     }
 }
 
