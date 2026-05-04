@@ -12,6 +12,45 @@ const rootLayout = fs.readFileSync(new URL('../src/app/layout.tsx', import.meta.
 const nextConfig = fs.readFileSync(new URL('../next.config.ts', import.meta.url), 'utf8');
 const playgroundClient = fs.readFileSync(new URL('../src/app/playground-client.tsx', import.meta.url), 'utf8');
 
+test('prompt inspector exposes final prompt blocks and warnings in Chinese', () => {
+    const promptInspectorPath = new URL('../src/components/prompt-inspector.tsx', import.meta.url);
+
+    assert.equal(fs.existsSync(promptInspectorPath), true, 'PromptInspector component should exist');
+
+    const promptInspector = fs.readFileSync(promptInspectorPath, 'utf8');
+
+    assert.match(promptInspector, /最终提示词/);
+    assert.match(promptInspector, /启用控制块/);
+    assert.match(promptInspector, /原始提示词/);
+    assert.match(promptInspector, /警告/);
+    assert.match(promptInspector, /getPromptBlockTitleLabel/);
+    assert.match(promptInspector, /['"]SOURCE IMAGE['"]:\s*'源图'/);
+    assert.match(promptInspector, /['"]MASK POLICY['"]:\s*'蒙版策略'/);
+});
+
+test('generation form uses the shared prompt inspector for guided prompts', () => {
+    const generationForm = fs.readFileSync(new URL('../src/components/generation-form.tsx', import.meta.url), 'utf8');
+
+    assert.match(generationForm, /import \{ PromptInspector \} from '@\/components\/prompt-inspector'/);
+    assert.match(generationForm, /<PromptInspector/);
+    assert.match(generationForm, /rawPrompt=\{builtPrompt\.rawPrompt\}/);
+    assert.match(generationForm, /fullPrompt=\{builtPrompt\.fullPrompt\}/);
+    assert.match(generationForm, /blocks=\{builtPrompt\.blocks\}/);
+    assert.match(generationForm, /warnings=\{builtPrompt\.warnings\}/);
+});
+
+test('task queue shows saved prompt inspector metadata for completed jobs', () => {
+    const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
+
+    assert.match(taskQueuePanel, /import \{ PromptInspector, type PromptInspectorBlock \} from '@\/components\/prompt-inspector'/);
+    assert.match(taskQueuePanel, /getJobPromptInspectorData/);
+    assert.match(taskQueuePanel, /job\.params\.full_prompt/);
+    assert.match(taskQueuePanel, /job\.params\.raw_prompt/);
+    assert.match(taskQueuePanel, /job\.params\.prompt_blocks/);
+    assert.match(taskQueuePanel, /job\.params\.prompt_warnings/);
+    assert.match(taskQueuePanel, /<PromptInspector/);
+});
+
 test('prompt template gallery uses the configured R2 image host', () => {
     assert.match(promptTemplateGallery, /from 'antd'/);
     assert.match(promptTemplateGallery, /<AntImage/);

@@ -1,5 +1,6 @@
 'use client';
 
+import { PromptInspector, type PromptInspectorBlock } from '@/components/prompt-inspector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { CostDetails, GptImageModel } from '@/lib/cost-utils';
@@ -77,6 +78,45 @@ function imageSrc(image: QueueImageJob['images'][number]): string {
 function previewImageSrc(previewImage: NonNullable<QueueImageJob['previewImage']>): string {
     const format = previewImage.output_format === 'jpeg' ? 'jpeg' : (previewImage.output_format ?? 'png');
     return `data:image/${format};base64,${previewImage.b64_json}`;
+}
+
+function isPromptInspectorBlock(value: unknown): value is PromptInspectorBlock {
+    if (!value || typeof value !== 'object') return false;
+
+    const candidate = value as Record<string, unknown>;
+
+    return (
+        typeof candidate.id === 'string' &&
+        typeof candidate.title === 'string' &&
+        typeof candidate.content === 'string' &&
+        typeof candidate.enabled === 'boolean'
+    );
+}
+
+function getStringArray(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function getJobPromptInspectorData(job: QueueImageJob): {
+    rawPrompt?: string;
+    fullPrompt: string;
+    blocks: PromptInspectorBlock[];
+    warnings: string[];
+} | null {
+    const fullPrompt = job.params.full_prompt;
+
+    if (typeof fullPrompt !== 'string' || !fullPrompt.trim()) {
+        return null;
+    }
+
+    const rawPrompt = job.params.raw_prompt;
+
+    return {
+        rawPrompt: typeof rawPrompt === 'string' ? rawPrompt : undefined,
+        fullPrompt,
+        blocks: Array.isArray(job.params.prompt_blocks) ? job.params.prompt_blocks.filter(isPromptInspectorBlock) : [],
+        warnings: getStringArray(job.params.prompt_warnings)
+    };
 }
 
 function TaskStatusBadge({ status }: { status: QueueImageJob['status'] }) {
@@ -185,52 +225,68 @@ export function TaskQueuePanel({ jobs, onClearQueue, onCancelPendingJob }: TaskQ
                     </div>
                 ) : (
                     <div className='flex flex-col gap-3'>
-                        {jobs.map((job) => (
-                            <article
-                                key={job.id}
-                                className='flex gap-3 rounded-md border border-white/10 bg-neutral-950/70 p-3'>
-                                <JobPreview job={job} />
-                                <div className='flex min-w-0 flex-1 flex-col gap-2'>
-                                    <div className='flex flex-wrap items-center gap-2'>
-                                        <TaskStatusBadge status={job.status} />
-                                        <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
-                                            {job.mode === 'edit' ? '编辑' : '生成'}
-                                        </span>
-                                        <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
-                                            {job.model}
-                                        </span>
-                                        {job.storageModeUsed === 'r2' && (
-                                            <span className='inline-flex items-center gap-1 rounded-full border border-orange-400/30 bg-orange-500/10 px-2 py-0.5 text-xs text-orange-200'>
-                                                <Cloud className='h-3.5 w-3.5' />
-                                                R2
+                        {jobs.map((job) => {
+                            const promptInspectorData = getJobPromptInspectorData(job);
+
+                            return (
+                                <article
+                                    key={job.id}
+                                    className='flex gap-3 rounded-md border border-white/10 bg-neutral-950/70 p-3'>
+                                    <JobPreview job={job} />
+                                    <div className='flex min-w-0 flex-1 flex-col gap-2'>
+                                        <div className='flex flex-wrap items-center gap-2'>
+                                            <TaskStatusBadge status={job.status} />
+                                            <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
+                                                {job.mode === 'edit' ? '编辑' : '生成'}
                                             </span>
+                                            <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
+                                                {job.model}
+                                            </span>
+                                            {job.storageModeUsed === 'r2' && (
+                                                <span className='inline-flex items-center gap-1 rounded-full border border-orange-400/30 bg-orange-500/10 px-2 py-0.5 text-xs text-orange-200'>
+                                                    <Cloud className='h-3.5 w-3.5' />
+                                                    R2
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className='line-clamp-2 text-sm leading-5 text-white/85'>{job.prompt}</p>
+                                        <div className='flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/45'>
+                                            <span>创建：{formatTime(job.createdAt)}</span>
+                                            {job.startedAt && <span>开始：{formatTime(job.startedAt)}</span>}
+                                            {job.durationMs !== null && (
+                                                <span>耗时：{formatDuration(job.durationMs)}</span>
+                                            )}
+                                        </div>
+                                        {promptInspectorData && (
+                                            <PromptInspector
+                                                rawPrompt={promptInspectorData.rawPrompt}
+                                                fullPrompt={promptInspectorData.fullPrompt}
+                                                blocks={promptInspectorData.blocks}
+                                                warnings={promptInspectorData.warnings}
+                                                defaultOpen={false}
+                                                compact
+                                            />
+                                        )}
+                                        {job.status === 'failed' && job.error && (
+                                            <p className='text-xs leading-5 text-red-300'>{job.error}</p>
+                                        )}
+                                        {job.status === 'pending' && (
+                                            <div>
+                                                <Button
+                                                    type='button'
+                                                    variant='ghost'
+                                                    size='sm'
+                                                    onClick={() => onCancelPendingJob(job.id)}
+                                                    className='h-8 rounded-md px-2 text-white/60 hover:bg-red-500/10 hover:text-red-200'>
+                                                    <XCircle className='mr-1.5 h-4 w-4' />
+                                                    取消生成
+                                                </Button>
+                                            </div>
                                         )}
                                     </div>
-                                    <p className='line-clamp-2 text-sm leading-5 text-white/85'>{job.prompt}</p>
-                                    <div className='flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/45'>
-                                        <span>创建：{formatTime(job.createdAt)}</span>
-                                        {job.startedAt && <span>开始：{formatTime(job.startedAt)}</span>}
-                                        {job.durationMs !== null && <span>耗时：{formatDuration(job.durationMs)}</span>}
-                                    </div>
-                                    {job.status === 'failed' && job.error && (
-                                        <p className='text-xs leading-5 text-red-300'>{job.error}</p>
-                                    )}
-                                    {job.status === 'pending' && (
-                                        <div>
-                                            <Button
-                                                type='button'
-                                                variant='ghost'
-                                                size='sm'
-                                                onClick={() => onCancelPendingJob(job.id)}
-                                                className='h-8 rounded-md px-2 text-white/60 hover:bg-red-500/10 hover:text-red-200'>
-                                                <XCircle className='mr-1.5 h-4 w-4' />
-                                                取消生成
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </article>
-                        ))}
+                                </article>
+                            );
+                        })}
                     </div>
                 )}
             </CardContent>

@@ -1,6 +1,7 @@
 'use client';
 
 import { ModeToggle } from '@/components/mode-toggle';
+import { PromptInspector } from '@/components/prompt-inspector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -124,19 +125,6 @@ const LANGUAGE_OPTIONS: Array<{ value: PromptOutputLanguage; label: string }> = 
     { value: 'ja', label: '日文' },
     { value: 'ko', label: '韩文' }
 ];
-
-const BLOCK_TITLE_LABELS: Record<string, string> = {
-    TASK: '任务',
-    SPECS: '规格',
-    DESC: '描述',
-    STYLE: '风格',
-    'TEXT POLICY': '文字策略',
-    QUALITY: '质量'
-};
-
-function getBlockTitleLabel(title: string): string {
-    return BLOCK_TITLE_LABELS[title] ?? title;
-}
 
 const RadioItemWithIcon = ({
     value,
@@ -755,33 +743,12 @@ export function GenerationForm({
                                         </div>
                                     </div>
 
-                                    <div className='space-y-2 rounded-md border border-white/10 bg-black p-3'>
-                                        <div className='flex items-center justify-between gap-3'>
-                                            <Label className='text-xs font-medium text-white'>提示词检查器</Label>
-                                            <span className='text-xs text-white/45'>
-                                                {builtPrompt.blocks.length} 个控制块
-                                            </span>
-                                        </div>
-                                        <pre className='max-h-44 overflow-y-auto rounded border border-white/10 bg-neutral-950 p-2 text-xs leading-5 break-words whitespace-pre-wrap text-white/70'>
-                                            {builtPrompt.fullPrompt}
-                                        </pre>
-                                        <div className='flex flex-wrap gap-1.5'>
-                                            {builtPrompt.blocks.map((promptBlock) => (
-                                                <span
-                                                    key={promptBlock.id}
-                                                    className='rounded border border-white/10 px-1.5 py-0.5 text-[11px] text-white/55'>
-                                                    {getBlockTitleLabel(promptBlock.title)}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        {builtPrompt.warnings.length > 0 && (
-                                            <div className='space-y-1 text-xs text-amber-200'>
-                                                {builtPrompt.warnings.map((warning) => (
-                                                    <p key={warning}>{warning}</p>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
+                                    <PromptInspector
+                                        rawPrompt={builtPrompt.rawPrompt}
+                                        fullPrompt={builtPrompt.fullPrompt}
+                                        blocks={builtPrompt.blocks}
+                                        warnings={builtPrompt.warnings}
+                                    />
                                 </div>
                             )}
 
