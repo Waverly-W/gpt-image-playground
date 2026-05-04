@@ -168,7 +168,11 @@ export default function ImagePlaygroundClient({
         if (mode === 'generate') {
             const genData = formData as GenerationFormData;
             apiFormData.append('model', genModel);
-            apiFormData.append('prompt', genPrompt);
+            apiFormData.append('prompt', genData.prompt);
+            apiFormData.append('prompt_mode', genData.promptMode);
+            if (genData.promptMode === 'guided' && genData.promptBuilderConfig) {
+                apiFormData.append('prompt_builder_config', JSON.stringify(genData.promptBuilderConfig));
+            }
             apiFormData.append('n', genN[0].toString());
             apiFormData.append(
                 'size',

@@ -19,7 +19,17 @@ import {
 } from '@/lib/batch-csv';
 import type { GptImageModel } from '@/lib/cost-utils';
 import { IMAGE_MODEL_OPTIONS } from '@/lib/image-models';
-import { getPresetTooltip, validateGptImage2Size } from '@/lib/size-utils';
+import { buildPrompt } from '@/lib/prompt-builder/build-prompt';
+import { SCENE_CATALOG, STYLE_CATALOG } from '@/lib/prompt-builder/catalogs';
+import type {
+    PromptBlock,
+    PromptBuilderConfig,
+    PromptBuilderMode,
+    PromptIntentMode,
+    PromptOutputLanguage,
+    PromptTextPolicy
+} from '@/lib/prompt-builder/types';
+import { getPresetDimensions, getPresetTooltip, validateGptImage2Size } from '@/lib/size-utils';
 import type { SizePreset } from '@/lib/size-utils';
 import {
     Square,
@@ -45,6 +55,11 @@ import * as React from 'react';
 
 export type GenerationFormData = {
     prompt: string;
+    promptMode: PromptBuilderMode;
+    promptBuilderConfig?: PromptBuilderConfig;
+    fullPrompt?: string;
+    promptBlocks?: PromptBlock[];
+    promptWarnings?: string[];
     n: number;
     size: SizePreset;
     customWidth: number;
@@ -93,6 +108,21 @@ type GenerationFormProps = {
 };
 
 type GenerationMode = 'single' | 'batch';
+
+const TEXT_POLICY_OPTIONS: Array<{ value: PromptTextPolicy; label: string }> = [
+    { value: 'allow-short-text', label: '短文字' },
+    { value: 'no-text', label: '无文字' },
+    { value: 'text-first', label: '文字优先' },
+    { value: 'structured-labels', label: '结构标签' }
+];
+
+const LANGUAGE_OPTIONS: Array<{ value: PromptOutputLanguage; label: string }> = [
+    { value: 'auto', label: '自动' },
+    { value: 'zh', label: '中文' },
+    { value: 'en', label: 'English' },
+    { value: 'ja', label: '日本語' },
+    { value: 'ko', label: '한국어' }
+];
 
 const RadioItemWithIcon = ({
     value,
@@ -159,6 +189,11 @@ export function GenerationForm({
     const customSizeInvalid = size === 'custom' && !customSizeValidation.valid;
     const batchFileInputRef = React.useRef<HTMLInputElement>(null);
     const [generationMode, setGenerationMode] = React.useState<GenerationMode>('single');
+    const [promptMode, setPromptMode] = React.useState<PromptBuilderMode>('free');
+    const [sceneId, setSceneId] = React.useState<PromptIntentMode>('poster');
+    const [styleId, setStyleId] = React.useState('minimal');
+    const [textPolicy, setTextPolicy] = React.useState<PromptTextPolicy>('allow-short-text');
+    const [outputLanguage, setOutputLanguage] = React.useState<PromptOutputLanguage>('auto');
     const [batchRows, setBatchRows] = React.useState<BatchGenerationRow[]>([]);
     const [batchErrors, setBatchErrors] = React.useState<string[]>([]);
 
@@ -192,6 +227,21 @@ export function GenerationForm({
             partialImages
         ]
     );
+    const resolvedGenerationSize =
+        size === 'custom' ? `${customWidth}x${customHeight}` : (getPresetDimensions(size, model) ?? size);
+    const promptBuilderConfig = React.useMemo<PromptBuilderConfig>(
+        () => ({
+            promptMode,
+            rawDescription: prompt,
+            sceneId,
+            styleId,
+            textPolicy,
+            outputLanguage,
+            size: resolvedGenerationSize
+        }),
+        [promptMode, prompt, sceneId, styleId, textPolicy, outputLanguage, resolvedGenerationSize]
+    );
+    const builtPrompt = React.useMemo(() => buildPrompt(promptBuilderConfig), [promptBuilderConfig]);
 
     // Disable streaming when n > 1 (OpenAI limitation)
     React.useEffect(() => {
@@ -221,6 +271,11 @@ export function GenerationForm({
         }
         const formData: GenerationFormData = {
             prompt,
+            promptMode,
+            promptBuilderConfig,
+            fullPrompt: builtPrompt.fullPrompt,
+            promptBlocks: builtPrompt.blocks,
+            promptWarnings: builtPrompt.warnings,
             n: n[0],
             size,
             customWidth,
@@ -520,12 +575,49 @@ export function GenerationForm({
                     {generationMode === 'single' && (
                         <>
                             <div className='space-y-1.5'>
-                                <Label htmlFor='prompt' className='text-white'>
-                                    提示词
-                                </Label>
+                                <div className='flex items-center justify-between gap-3'>
+                                    <Label htmlFor='prompt' className='text-white'>
+                                        {promptMode === 'guided' ? '创作意图' : '提示词'}
+                                    </Label>
+                                    <div
+                                        role='tablist'
+                                        aria-label='提示词模式'
+                                        className='grid min-h-9 w-40 grid-cols-2 overflow-hidden rounded-md border border-white/15 bg-black p-1'>
+                                        <button
+                                            type='button'
+                                            role='tab'
+                                            aria-selected={promptMode === 'free'}
+                                            onClick={() => setPromptMode('free')}
+                                            disabled={isLoading}
+                                            className={`rounded px-2 text-xs transition-colors ${
+                                                promptMode === 'free'
+                                                    ? 'bg-white text-black'
+                                                    : 'text-white/65 hover:bg-white/10 hover:text-white'
+                                            } disabled:cursor-not-allowed disabled:opacity-50`}>
+                                            Free
+                                        </button>
+                                        <button
+                                            type='button'
+                                            role='tab'
+                                            aria-selected={promptMode === 'guided'}
+                                            onClick={() => setPromptMode('guided')}
+                                            disabled={isLoading}
+                                            className={`rounded px-2 text-xs transition-colors ${
+                                                promptMode === 'guided'
+                                                    ? 'bg-white text-black'
+                                                    : 'text-white/65 hover:bg-white/10 hover:text-white'
+                                            } disabled:cursor-not-allowed disabled:opacity-50`}>
+                                            Guided
+                                        </button>
+                                    </div>
+                                </div>
                                 <Textarea
                                     id='prompt'
-                                    placeholder='例如：一只写实风格的猫宇航员漂浮在太空中'
+                                    placeholder={
+                                        promptMode === 'guided'
+                                            ? '例如：做一张关于长期主义的中文大字海报'
+                                            : '例如：一只写实风格的猫宇航员漂浮在太空中'
+                                    }
                                     value={prompt}
                                     onChange={(e) => setPrompt(e.target.value)}
                                     required
@@ -533,6 +625,140 @@ export function GenerationForm({
                                     className='min-h-[80px] rounded-md border border-white/20 bg-black text-white placeholder:text-white/40 focus:border-white/50 focus:ring-white/50'
                                 />
                             </div>
+
+                            {promptMode === 'guided' && (
+                                <div className='space-y-3 rounded-md border border-white/10 bg-white/[0.03] p-3'>
+                                    <div className='grid gap-3 sm:grid-cols-2'>
+                                        <div className='space-y-1.5'>
+                                            <Label htmlFor='prompt-scene' className='text-xs text-white/70'>
+                                                场景
+                                            </Label>
+                                            <Select
+                                                value={sceneId}
+                                                onValueChange={(value) => setSceneId(value as PromptIntentMode)}
+                                                disabled={isLoading}>
+                                                <SelectTrigger
+                                                    id='prompt-scene'
+                                                    className='rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50'>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent className='z-[100] border-white/20 bg-black text-white'>
+                                                    {SCENE_CATALOG.map((scene) => (
+                                                        <SelectItem
+                                                            key={scene.id}
+                                                            value={scene.id}
+                                                            className='focus:bg-white/10'>
+                                                            {scene.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className='space-y-1.5'>
+                                            <Label htmlFor='prompt-style' className='text-xs text-white/70'>
+                                                风格
+                                            </Label>
+                                            <Select value={styleId} onValueChange={setStyleId} disabled={isLoading}>
+                                                <SelectTrigger
+                                                    id='prompt-style'
+                                                    className='rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50'>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent className='z-[100] border-white/20 bg-black text-white'>
+                                                    {STYLE_CATALOG.map((style) => (
+                                                        <SelectItem
+                                                            key={style.id}
+                                                            value={style.id}
+                                                            className='focus:bg-white/10'>
+                                                            {style.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className='space-y-1.5'>
+                                            <Label htmlFor='prompt-text-policy' className='text-xs text-white/70'>
+                                                文字策略
+                                            </Label>
+                                            <Select
+                                                value={textPolicy}
+                                                onValueChange={(value) => setTextPolicy(value as PromptTextPolicy)}
+                                                disabled={isLoading}>
+                                                <SelectTrigger
+                                                    id='prompt-text-policy'
+                                                    className='rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50'>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent className='z-[100] border-white/20 bg-black text-white'>
+                                                    {TEXT_POLICY_OPTIONS.map((option) => (
+                                                        <SelectItem
+                                                            key={option.value}
+                                                            value={option.value}
+                                                            className='focus:bg-white/10'>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className='space-y-1.5'>
+                                            <Label htmlFor='prompt-language' className='text-xs text-white/70'>
+                                                语言
+                                            </Label>
+                                            <Select
+                                                value={outputLanguage}
+                                                onValueChange={(value) =>
+                                                    setOutputLanguage(value as PromptOutputLanguage)
+                                                }
+                                                disabled={isLoading}>
+                                                <SelectTrigger
+                                                    id='prompt-language'
+                                                    className='rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50'>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent className='z-[100] border-white/20 bg-black text-white'>
+                                                    {LANGUAGE_OPTIONS.map((option) => (
+                                                        <SelectItem
+                                                            key={option.value}
+                                                            value={option.value}
+                                                            className='focus:bg-white/10'>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+
+                                    <div className='space-y-2 rounded-md border border-white/10 bg-black p-3'>
+                                        <div className='flex items-center justify-between gap-3'>
+                                            <Label className='text-xs font-medium text-white'>Prompt Inspector</Label>
+                                            <span className='text-xs text-white/45'>
+                                                {builtPrompt.blocks.length} blocks
+                                            </span>
+                                        </div>
+                                        <pre className='max-h-44 overflow-y-auto rounded border border-white/10 bg-neutral-950 p-2 text-xs leading-5 break-words whitespace-pre-wrap text-white/70'>
+                                            {builtPrompt.fullPrompt}
+                                        </pre>
+                                        <div className='flex flex-wrap gap-1.5'>
+                                            {builtPrompt.blocks.map((promptBlock) => (
+                                                <span
+                                                    key={promptBlock.id}
+                                                    className='rounded border border-white/10 px-1.5 py-0.5 text-[11px] text-white/55'>
+                                                    {promptBlock.title}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        {builtPrompt.warnings.length > 0 && (
+                                            <div className='space-y-1 text-xs text-amber-200'>
+                                                {builtPrompt.warnings.map((warning) => (
+                                                    <p key={warning}>{warning}</p>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className='space-y-2'>
                                 <Label htmlFor='n-slider' className='text-white'>

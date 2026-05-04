@@ -1,6 +1,7 @@
 import { recordImageOwner } from '@/lib/image-ownership';
 import { putR2Image, resolveImageStorageMode, type ImageStorageMode } from '@/lib/image-storage';
 import { createOpenAIClient, getOpenAIConfig } from '@/lib/openai-config';
+import { buildPromptFromFormData } from '@/lib/prompt-builder/build-prompt';
 import { authErrorResponse, requireSession } from '@/lib/server-auth';
 import fs from 'fs/promises';
 import { lookup } from 'mime-types';
@@ -99,7 +100,8 @@ export async function POST(request: NextRequest) {
         const formData = await request.formData();
 
         const mode = formData.get('mode') as 'generate' | 'edit' | null;
-        const prompt = formData.get('prompt') as string | null;
+        const builtPrompt = buildPromptFromFormData(formData);
+        const prompt = builtPrompt.fullPrompt;
         const model =
             (formData.get('model') as 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5' | 'gpt-image-2' | null) ||
             'gpt-image-2';

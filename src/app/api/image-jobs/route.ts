@@ -1,4 +1,5 @@
 import { calculateApiCost, type GptImageModel } from '@/lib/cost-utils';
+import { runImageGeneration, runStreamingImageGeneration } from '@/lib/image-generation-service';
 import {
     createImageJob,
     countRunningImageJobs,
@@ -11,7 +12,7 @@ import {
     completeImageJob,
     updateImageJobPreview
 } from '@/lib/image-jobs';
-import { runImageGeneration, runStreamingImageGeneration } from '@/lib/image-generation-service';
+import { buildPromptFromFormData, serializeBuiltPromptForParams } from '@/lib/prompt-builder/build-prompt';
 import { authErrorResponse, requireSession } from '@/lib/server-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -117,7 +118,8 @@ export async function POST(request: NextRequest) {
     try {
         const formData = await request.formData();
         const mode = formData.get('mode') as 'generate' | 'edit' | null;
-        const prompt = formData.get('prompt') as string | null;
+        const builtPrompt = buildPromptFromFormData(formData);
+        const prompt = builtPrompt.fullPrompt;
         const model = (formData.get('model') as GptImageModel | null) || 'gpt-image-2';
 
         if (!mode || !prompt) {
@@ -129,7 +131,10 @@ export async function POST(request: NextRequest) {
             mode,
             prompt,
             model,
-            params: serializeJobParams(formData)
+            params: {
+                ...serializeJobParams(formData),
+                ...serializeBuiltPromptForParams(builtPrompt)
+            }
         });
 
         queuedJobPayloads.set(job.id, { ownerUserId: session.id, formData, model });
