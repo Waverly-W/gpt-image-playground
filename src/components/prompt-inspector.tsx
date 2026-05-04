@@ -9,6 +9,7 @@ type PromptInspectorProps = {
     warnings?: string[];
     defaultOpen?: boolean;
     compact?: boolean;
+    showSummary?: boolean;
 };
 
 const PROMPT_BLOCK_TITLE_LABELS: Record<string, string> = {
@@ -39,10 +40,69 @@ export function PromptInspector({
     blocks = [],
     warnings = [],
     defaultOpen = true,
-    compact = false
+    compact = false,
+    showSummary = true
 }: PromptInspectorProps) {
     const enabledBlocks = blocks.filter((promptBlock) => promptBlock.enabled);
     const shouldShowRawPrompt = rawPrompt && rawPrompt !== fullPrompt;
+    const content = (
+        <div className={`flex flex-col ${compact ? 'gap-3' : 'gap-4'} ${showSummary ? 'mt-3' : ''}`}>
+            {shouldShowRawPrompt && (
+                <section className='space-y-1.5'>
+                    <h4 className='text-xs font-medium text-white/65'>原始提示词</h4>
+                    <p className='rounded border border-white/10 bg-neutral-950 p-2 text-xs leading-5 break-words whitespace-pre-wrap text-white/65'>
+                        {rawPrompt}
+                    </p>
+                </section>
+            )}
+
+            <section className='space-y-1.5'>
+                <h4 className='text-xs font-medium text-white/65'>最终提示词</h4>
+                <pre
+                    className={`overflow-y-auto rounded border border-white/10 bg-neutral-950 p-2 text-xs leading-5 break-words whitespace-pre-wrap text-white/75 ${
+                        compact ? 'max-h-36' : 'max-h-52'
+                    }`}>
+                    {fullPrompt}
+                </pre>
+            </section>
+
+            {enabledBlocks.length > 0 && (
+                <section className='space-y-2'>
+                    <div className='flex items-center justify-between gap-3'>
+                        <h4 className='text-xs font-medium text-white/65'>启用控制块</h4>
+                        <span className='text-xs text-white/40'>{enabledBlocks.length}</span>
+                    </div>
+                    <div className='flex flex-col gap-2'>
+                        {enabledBlocks.map((promptBlock) => (
+                            <div key={promptBlock.id} className='rounded border border-white/10 bg-white/[0.03] p-2'>
+                                <div className='mb-1 text-xs font-medium text-white'>
+                                    {getPromptBlockTitleLabel(promptBlock.title)}
+                                </div>
+                                <p className='text-xs leading-5 break-words whitespace-pre-wrap text-white/60'>
+                                    {promptBlock.content}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {warnings.length > 0 && (
+                <section className='space-y-2'>
+                    <h4 className='text-xs font-medium text-amber-200'>警告</h4>
+                    <ul className='space-y-1 text-xs leading-5 text-amber-200'>
+                        {warnings.map((warning) => (
+                            <li key={warning}>{warning}</li>
+                        ))}
+                    </ul>
+                </section>
+            )}
+        </div>
+    );
+
+    if (!showSummary) {
+        return <div className='rounded-md border border-white/10 bg-black/80 p-3 text-sm text-white/75'>{content}</div>;
+    }
 
     return (
         <details
@@ -54,59 +114,7 @@ export function PromptInspector({
                     {enabledBlocks.length > 0 ? `${enabledBlocks.length} 个控制块` : '自由提示词'}
                 </span>
             </summary>
-
-            <div className={`mt-3 flex flex-col ${compact ? 'gap-3' : 'gap-4'}`}>
-                {shouldShowRawPrompt && (
-                    <section className='space-y-1.5'>
-                        <h4 className='text-xs font-medium text-white/65'>原始提示词</h4>
-                        <p className='rounded border border-white/10 bg-neutral-950 p-2 text-xs leading-5 break-words whitespace-pre-wrap text-white/65'>
-                            {rawPrompt}
-                        </p>
-                    </section>
-                )}
-
-                <section className='space-y-1.5'>
-                    <h4 className='text-xs font-medium text-white/65'>最终提示词</h4>
-                    <pre
-                        className={`overflow-y-auto rounded border border-white/10 bg-neutral-950 p-2 text-xs leading-5 break-words whitespace-pre-wrap text-white/75 ${
-                            compact ? 'max-h-36' : 'max-h-52'
-                        }`}>
-                        {fullPrompt}
-                    </pre>
-                </section>
-
-                {enabledBlocks.length > 0 && (
-                    <section className='space-y-2'>
-                        <div className='flex items-center justify-between gap-3'>
-                            <h4 className='text-xs font-medium text-white/65'>启用控制块</h4>
-                            <span className='text-xs text-white/40'>{enabledBlocks.length}</span>
-                        </div>
-                        <div className='flex flex-col gap-2'>
-                            {enabledBlocks.map((promptBlock) => (
-                                <div key={promptBlock.id} className='rounded border border-white/10 bg-white/[0.03] p-2'>
-                                    <div className='mb-1 text-xs font-medium text-white'>
-                                        {getPromptBlockTitleLabel(promptBlock.title)}
-                                    </div>
-                                    <p className='text-xs leading-5 break-words whitespace-pre-wrap text-white/60'>
-                                        {promptBlock.content}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                )}
-
-                {warnings.length > 0 && (
-                    <section className='space-y-2'>
-                        <h4 className='text-xs font-medium text-amber-200'>警告</h4>
-                        <ul className='space-y-1 text-xs leading-5 text-amber-200'>
-                            {warnings.map((warning) => (
-                                <li key={warning}>{warning}</li>
-                            ))}
-                        </ul>
-                    </section>
-                )}
-            </div>
+            {content}
         </details>
     );
 }

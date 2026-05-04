@@ -43,21 +43,27 @@ test('task queue shows saved prompt inspector metadata for completed jobs', () =
     const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
 
     assert.match(taskQueuePanel, /import \{ PromptInspector, type PromptInspectorBlock \} from '@\/components\/prompt-inspector'/);
+    assert.match(taskQueuePanel, /PromptInspectorDialog/);
     assert.match(taskQueuePanel, /getJobPromptInspectorData/);
     assert.match(taskQueuePanel, /job\.params\.full_prompt/);
     assert.match(taskQueuePanel, /job\.params\.raw_prompt/);
     assert.match(taskQueuePanel, /job\.params\.prompt_blocks/);
     assert.match(taskQueuePanel, /job\.params\.prompt_warnings/);
     assert.match(taskQueuePanel, /<PromptInspector/);
+    assert.match(taskQueuePanel, /DialogTrigger/);
+    assert.match(taskQueuePanel, /DialogContent/);
+    assert.match(taskQueuePanel, /aria-label='查看提示词检查器'/);
+    assert.match(taskQueuePanel, /FileSearch/);
+    assert.doesNotMatch(taskQueuePanel, /<div className='sm:pl-\[6\.75rem\]'>\s*<PromptInspector/);
 });
 
-test('task queue keeps thumbnails square when prompt inspector expands', () => {
+test('task queue keeps thumbnails square when task dialogs open', () => {
     const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
 
     assert.match(taskQueuePanel, /className='flex flex-col gap-3 rounded-md border border-white\/10 bg-neutral-950\/70 p-3'/);
     assert.match(taskQueuePanel, /className='flex items-start gap-3'/);
     assert.match(taskQueuePanel, /relative h-24 w-24 shrink-0 self-start overflow-hidden rounded-md/);
-    assert.match(taskQueuePanel, /className='sm:pl-\[6\.75rem\]'/);
+    assert.doesNotMatch(taskQueuePanel, /<div className='sm:pl-\[6\.75rem\]'>\s*<PromptInspector/);
 });
 
 test('task queue exposes quality feedback controls for completed jobs', () => {

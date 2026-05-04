@@ -25,6 +25,7 @@ import {
     CheckCircle2,
     Clock3,
     Cloud,
+    FileSearch,
     ImageIcon,
     Layers,
     Loader2,
@@ -346,6 +347,38 @@ function QualityFeedbackPanel({
     );
 }
 
+function PromptInspectorDialog({ promptInspectorData }: { promptInspectorData: NonNullable<ReturnType<typeof getJobPromptInspectorData>> }) {
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button
+                    type='button'
+                    variant='ghost'
+                    size='icon'
+                    aria-label='查看提示词检查器'
+                    className='h-8 w-8 rounded-md text-white/35 hover:bg-white/10 hover:text-white/70'>
+                    <FileSearch className='h-4 w-4' />
+                </Button>
+            </DialogTrigger>
+            <DialogContent className='border-neutral-700 bg-neutral-900 text-white sm:max-w-[720px]'>
+                <DialogHeader>
+                    <DialogTitle className='text-white'>提示词检查器</DialogTitle>
+                    <DialogDescription className='text-neutral-400'>
+                        查看本次任务实际提交的最终提示词、控制块和警告。
+                    </DialogDescription>
+                </DialogHeader>
+                <PromptInspector
+                    rawPrompt={promptInspectorData.rawPrompt}
+                    fullPrompt={promptInspectorData.fullPrompt}
+                    blocks={promptInspectorData.blocks}
+                    warnings={promptInspectorData.warnings}
+                    showSummary={false}
+                />
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export function TaskQueuePanel({
     jobs,
     onClearQueue,
@@ -407,12 +440,17 @@ export function TaskQueuePanel({
                                                         </span>
                                                     )}
                                                 </div>
-                                                {job.status === 'completed' && (
-                                                    <QualityFeedbackPanel
-                                                        job={job}
-                                                        onUpdateQualityFeedback={onUpdateQualityFeedback}
-                                                    />
-                                                )}
+                                                <div className='flex shrink-0 items-center gap-1'>
+                                                    {promptInspectorData && (
+                                                        <PromptInspectorDialog promptInspectorData={promptInspectorData} />
+                                                    )}
+                                                    {job.status === 'completed' && (
+                                                        <QualityFeedbackPanel
+                                                            job={job}
+                                                            onUpdateQualityFeedback={onUpdateQualityFeedback}
+                                                        />
+                                                    )}
+                                                </div>
                                             </div>
                                             <p className='line-clamp-2 text-sm leading-5 text-white/85'>{job.prompt}</p>
                                             <div className='flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/45'>
@@ -440,18 +478,6 @@ export function TaskQueuePanel({
                                             )}
                                         </div>
                                     </div>
-                                    {promptInspectorData && (
-                                        <div className='sm:pl-[6.75rem]'>
-                                            <PromptInspector
-                                                rawPrompt={promptInspectorData.rawPrompt}
-                                                fullPrompt={promptInspectorData.fullPrompt}
-                                                blocks={promptInspectorData.blocks}
-                                                warnings={promptInspectorData.warnings}
-                                                defaultOpen={false}
-                                                compact
-                                            />
-                                        </div>
-                                    )}
                                 </article>
                             );
                         })}
