@@ -51,6 +51,15 @@ test('task queue shows saved prompt inspector metadata for completed jobs', () =
     assert.match(taskQueuePanel, /<PromptInspector/);
 });
 
+test('task queue keeps thumbnails square when prompt inspector expands', () => {
+    const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
+
+    assert.match(taskQueuePanel, /className='flex flex-col gap-3 rounded-md border border-white\/10 bg-neutral-950\/70 p-3'/);
+    assert.match(taskQueuePanel, /className='flex items-start gap-3'/);
+    assert.match(taskQueuePanel, /relative h-24 w-24 shrink-0 self-start overflow-hidden rounded-md/);
+    assert.match(taskQueuePanel, /className='sm:pl-\[6\.75rem\]'/);
+});
+
 test('prompt template gallery uses the configured R2 image host', () => {
     assert.match(promptTemplateGallery, /from 'antd'/);
     assert.match(promptTemplateGallery, /<AntImage/);

@@ -144,7 +144,7 @@ function JobPreview({ job }: { job: QueueImageJob }) {
                 preview={{
                     countRender: (current, total) => `${current} / ${total}`
                 }}>
-                <div className='relative aspect-square w-24 shrink-0 overflow-hidden rounded-md border border-white/15 bg-neutral-900 focus-within:ring-2 focus-within:ring-white focus-within:ring-offset-2 focus-within:ring-offset-black'>
+                <div className='relative h-24 w-24 shrink-0 self-start overflow-hidden rounded-md border border-white/15 bg-neutral-900 focus-within:ring-2 focus-within:ring-white focus-within:ring-offset-2 focus-within:ring-offset-black'>
                     <AntImage
                         src={imageSrc(firstImage)}
                         alt='任务缩略图'
@@ -169,7 +169,7 @@ function JobPreview({ job }: { job: QueueImageJob }) {
 
     if ((job.status === 'running' || job.status === 'failed') && job.previewImage) {
         return (
-            <div className='relative aspect-square w-24 shrink-0 overflow-hidden rounded-md border border-white/15 bg-neutral-900 focus-within:ring-2 focus-within:ring-white focus-within:ring-offset-2 focus-within:ring-offset-black'>
+            <div className='relative h-24 w-24 shrink-0 self-start overflow-hidden rounded-md border border-white/15 bg-neutral-900 focus-within:ring-2 focus-within:ring-white focus-within:ring-offset-2 focus-within:ring-offset-black'>
                 <AntImage
                     src={previewImageSrc(job.previewImage)}
                     alt={job.status === 'failed' ? '任务失败前预览图' : '任务流式预览图'}
@@ -189,7 +189,7 @@ function JobPreview({ job }: { job: QueueImageJob }) {
     }
 
     return (
-        <div className='flex aspect-square w-24 shrink-0 items-center justify-center rounded-md border border-white/10 bg-neutral-900 text-white/35'>
+        <div className='flex h-24 w-24 shrink-0 self-start items-center justify-center rounded-md border border-white/10 bg-neutral-900 text-white/35'>
             {job.status === 'failed' ? <XCircle className='h-6 w-6' /> : <ImageIcon className='h-6 w-6' />}
         </div>
     );
@@ -231,33 +231,53 @@ export function TaskQueuePanel({ jobs, onClearQueue, onCancelPendingJob }: TaskQ
                             return (
                                 <article
                                     key={job.id}
-                                    className='flex gap-3 rounded-md border border-white/10 bg-neutral-950/70 p-3'>
-                                    <JobPreview job={job} />
-                                    <div className='flex min-w-0 flex-1 flex-col gap-2'>
-                                        <div className='flex flex-wrap items-center gap-2'>
-                                            <TaskStatusBadge status={job.status} />
-                                            <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
-                                                {job.mode === 'edit' ? '编辑' : '生成'}
-                                            </span>
-                                            <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
-                                                {job.model}
-                                            </span>
-                                            {job.storageModeUsed === 'r2' && (
-                                                <span className='inline-flex items-center gap-1 rounded-full border border-orange-400/30 bg-orange-500/10 px-2 py-0.5 text-xs text-orange-200'>
-                                                    <Cloud className='h-3.5 w-3.5' />
-                                                    R2
+                                    className='flex flex-col gap-3 rounded-md border border-white/10 bg-neutral-950/70 p-3'>
+                                    <div className='flex items-start gap-3'>
+                                        <JobPreview job={job} />
+                                        <div className='flex min-w-0 flex-1 flex-col gap-2'>
+                                            <div className='flex flex-wrap items-center gap-2'>
+                                                <TaskStatusBadge status={job.status} />
+                                                <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
+                                                    {job.mode === 'edit' ? '编辑' : '生成'}
                                                 </span>
+                                                <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
+                                                    {job.model}
+                                                </span>
+                                                {job.storageModeUsed === 'r2' && (
+                                                    <span className='inline-flex items-center gap-1 rounded-full border border-orange-400/30 bg-orange-500/10 px-2 py-0.5 text-xs text-orange-200'>
+                                                        <Cloud className='h-3.5 w-3.5' />
+                                                        R2
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className='line-clamp-2 text-sm leading-5 text-white/85'>{job.prompt}</p>
+                                            <div className='flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/45'>
+                                                <span>创建：{formatTime(job.createdAt)}</span>
+                                                {job.startedAt && <span>开始：{formatTime(job.startedAt)}</span>}
+                                                {job.durationMs !== null && (
+                                                    <span>耗时：{formatDuration(job.durationMs)}</span>
+                                                )}
+                                            </div>
+                                            {job.status === 'failed' && job.error && (
+                                                <p className='text-xs leading-5 text-red-300'>{job.error}</p>
+                                            )}
+                                            {job.status === 'pending' && (
+                                                <div>
+                                                    <Button
+                                                        type='button'
+                                                        variant='ghost'
+                                                        size='sm'
+                                                        onClick={() => onCancelPendingJob(job.id)}
+                                                        className='h-8 rounded-md px-2 text-white/60 hover:bg-red-500/10 hover:text-red-200'>
+                                                        <XCircle className='mr-1.5 h-4 w-4' />
+                                                        取消生成
+                                                    </Button>
+                                                </div>
                                             )}
                                         </div>
-                                        <p className='line-clamp-2 text-sm leading-5 text-white/85'>{job.prompt}</p>
-                                        <div className='flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/45'>
-                                            <span>创建：{formatTime(job.createdAt)}</span>
-                                            {job.startedAt && <span>开始：{formatTime(job.startedAt)}</span>}
-                                            {job.durationMs !== null && (
-                                                <span>耗时：{formatDuration(job.durationMs)}</span>
-                                            )}
-                                        </div>
-                                        {promptInspectorData && (
+                                    </div>
+                                    {promptInspectorData && (
+                                        <div className='sm:pl-[6.75rem]'>
                                             <PromptInspector
                                                 rawPrompt={promptInspectorData.rawPrompt}
                                                 fullPrompt={promptInspectorData.fullPrompt}
@@ -266,24 +286,8 @@ export function TaskQueuePanel({ jobs, onClearQueue, onCancelPendingJob }: TaskQ
                                                 defaultOpen={false}
                                                 compact
                                             />
-                                        )}
-                                        {job.status === 'failed' && job.error && (
-                                            <p className='text-xs leading-5 text-red-300'>{job.error}</p>
-                                        )}
-                                        {job.status === 'pending' && (
-                                            <div>
-                                                <Button
-                                                    type='button'
-                                                    variant='ghost'
-                                                    size='sm'
-                                                    onClick={() => onCancelPendingJob(job.id)}
-                                                    className='h-8 rounded-md px-2 text-white/60 hover:bg-red-500/10 hover:text-red-200'>
-                                                    <XCircle className='mr-1.5 h-4 w-4' />
-                                                    取消生成
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </article>
                             );
                         })}
