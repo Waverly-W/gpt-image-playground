@@ -67,9 +67,26 @@ test('playground supports CSV batch generation through the existing job queue', 
     assert.match(generationForm, /createBatchCsvTemplate/);
     assert.match(generationForm, /parseBatchCsv/);
     assert.match(generationForm, /批量生成/);
+    assert.match(generationForm, /generationMode/);
+    assert.match(generationForm, /generationMode === 'batch'/);
+    assert.match(generationForm, /generationMode === 'single'/);
     assert.match(playgroundClient, /createBatchJobFormData/);
     assert.match(playgroundClient, /handleBatchApiCall/);
-    assert.match(playgroundClient, /waitForBatchJobToFinish/);
+    assert.doesNotMatch(playgroundClient, /waitForBatchJobToFinish/);
+    assert.match(playgroundClient, /Promise\.all\(\s*rows\.map/);
+});
+
+test('task queue exposes cancellation for pending jobs', () => {
+    const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
+    const jobRoute = fs.readFileSync(new URL('../src/app/api/image-jobs/[id]/route.ts', import.meta.url), 'utf8');
+
+    assert.match(taskQueuePanel, /onCancelPendingJob/);
+    assert.match(taskQueuePanel, /job\.status === 'pending'/);
+    assert.match(taskQueuePanel, /取消生成/);
+    assert.match(playgroundClient, /handleCancelPendingJob/);
+    assert.match(playgroundClient, /method: 'DELETE'/);
+    assert.match(jobRoute, /cancelPendingImageJobForUser/);
+    assert.match(jobRoute, /DELETE/);
 });
 
 test('mode toggle renders as a prominent sliding tab control', () => {

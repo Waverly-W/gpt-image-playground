@@ -242,48 +242,34 @@ export default function ImagePlaygroundClient({
         }
     };
 
-    const waitForBatchJobToFinish = async (jobId: string) => {
-        while (true) {
-            await new Promise((resolve) => window.setTimeout(resolve, 2000));
-            const response = await fetch(`/api/image-jobs/${jobId}`);
-            const result = (await response.json()) as { job?: QueueImageJob; error?: string };
-
-            if (!response.ok || !result.job) {
-                throw new Error(result.error || `任务状态查询失败，状态码 ${response.status}`);
-            }
-
-            setJobs((prev) => [result.job!, ...prev.filter((job) => job.id !== result.job!.id)]);
-            if (result.job.status === 'completed' || result.job.status === 'failed') {
-                return result.job;
-            }
-        }
-    };
-
     const handleBatchApiCall = async (rows: BatchGenerationRow[]) => {
         setIsCreatingJob(true);
         setError(null);
+        setBatchProgress(`正在创建 ${rows.length} 个批量任务`);
 
         try {
-            for (let index = 0; index < rows.length; index++) {
-                const row = rows[index];
-                setBatchProgress(`正在创建第 ${index + 1} / ${rows.length} 个批量任务`);
-                const response = await fetch('/api/image-jobs', {
-                    method: 'POST',
-                    body: createBatchJobFormData(row)
-                });
-                const result = (await response.json()) as { job?: QueueImageJob; error?: string };
+            const createdJobs = await Promise.all(
+                rows.map(async (row, index) => {
+                    const response = await fetch('/api/image-jobs', {
+                        method: 'POST',
+                        body: createBatchJobFormData(row)
+                    });
+                    const result = (await response.json()) as { job?: QueueImageJob; error?: string };
 
-                if (!response.ok || !result.job) {
-                    throw new Error(result.error || `第 ${index + 1} 个任务创建失败，状态码 ${response.status}`);
-                }
+                    if (!response.ok || !result.job) {
+                        throw new Error(result.error || `第 ${index + 1} 个任务创建失败，状态码 ${response.status}`);
+                    }
 
-                setJobs((prev) => [result.job!, ...prev.filter((job) => job.id !== result.job!.id)]);
-                void loadJobs();
-                setBatchProgress(`第 ${index + 1} / ${rows.length} 个任务生成中`);
-                await waitForBatchJobToFinish(result.job.id);
-            }
+                    return result.job;
+                })
+            );
 
-            setBatchProgress(`已完成 ${rows.length} 个批量任务`);
+            const newestFirst = [...createdJobs].reverse();
+            setJobs((prev) => [
+                ...newestFirst,
+                ...prev.filter((job) => !createdJobs.some((created) => created.id === job.id))
+            ]);
+            setBatchProgress(`已创建 ${createdJobs.length} 个批量任务，队列将自动调度生成`);
             void loadJobs();
         } catch (batchError) {
             console.error('Batch job creation error:', batchError);
@@ -293,6 +279,25 @@ export default function ImagePlaygroundClient({
             window.setTimeout(() => setBatchProgress(null), 3000);
         }
     };
+
+    const handleCancelPendingJob = React.useCallback(
+        async (jobId: string) => {
+            try {
+                const response = await fetch(`/api/image-jobs/${jobId}`, { method: 'DELETE' });
+                if (!response.ok) {
+                    const result = (await response.json()) as { error?: string };
+                    throw new Error(result.error || `取消失败，状态码 ${response.status}`);
+                }
+                setJobs((prev) => prev.filter((job) => job.id !== jobId));
+                setError(null);
+                void loadJobs();
+            } catch (cancelError) {
+                console.error('Failed to cancel pending image job:', cancelError);
+                setError(cancelError instanceof Error ? cancelError.message : '取消排队任务失败。');
+            }
+        },
+        [loadJobs]
+    );
 
     const handleClearQueue = React.useCallback(async () => {
         if (!window.confirm('确定清空任务队列吗？这会移除当前用户的任务记录。')) {
@@ -548,7 +553,11 @@ export default function ImagePlaygroundClient({
                             </div>
 
                             <div data-panel='task-queue' className='min-h-[640px] lg:h-[calc(100dvh-7rem)]'>
-                                <TaskQueuePanel jobs={jobs} onClearQueue={handleClearQueue} />
+                                <TaskQueuePanel
+                                    jobs={jobs}
+                                    onClearQueue={handleClearQueue}
+                                    onCancelPendingJob={handleCancelPendingJob}
+                                />
                             </div>
                         </section>
                     ) : (

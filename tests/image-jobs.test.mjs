@@ -6,10 +6,7 @@ import test from 'node:test';
 
 process.env.NODE_ENV = 'test';
 
-const dbPath = path.join(
-    tmpdir(),
-    `gpt-image-playground-jobs-${Date.now()}-${Math.random().toString(16).slice(2)}.db`
-);
+const dbPath = path.join(tmpdir(), `gpt-image-playground-jobs-${Date.now()}-${Math.random().toString(16).slice(2)}.db`);
 process.env.SQLITE_DB_PATH = dbPath;
 
 const db = await import('../src/lib/sqlite-db.ts');
@@ -256,4 +253,38 @@ test('marks only stale running jobs as failed after the timeout window', () => {
     );
     assert.equal(jobs.getImageJobForUser(stale.id, owner)?.status, 'failed');
     assert.equal(jobs.getImageJobForUser(fresh.id, owner)?.status, 'running');
+});
+
+test('cancels only pending image jobs owned by the requester', () => {
+    const owner = `usr_cancel_${Date.now()}`;
+    const pending = jobs.createImageJob({
+        ownerUserId: owner,
+        mode: 'generate',
+        prompt: 'cancel pending',
+        model: 'gpt-image-2',
+        params: {}
+    });
+    const running = jobs.createImageJob({
+        ownerUserId: owner,
+        mode: 'generate',
+        prompt: 'keep running',
+        model: 'gpt-image-2',
+        params: {}
+    });
+    const other = jobs.createImageJob({
+        ownerUserId: 'usr_cancel_other',
+        mode: 'generate',
+        prompt: 'other pending',
+        model: 'gpt-image-2',
+        params: {}
+    });
+
+    jobs.markImageJobRunning(running.id);
+
+    assert.equal(jobs.cancelPendingImageJobForUser(pending.id, owner), true);
+    assert.equal(jobs.getImageJobForUser(pending.id, owner), null);
+    assert.equal(jobs.cancelPendingImageJobForUser(running.id, owner), false);
+    assert.equal(jobs.getImageJobForUser(running.id, owner)?.status, 'running');
+    assert.equal(jobs.cancelPendingImageJobForUser(other.id, owner), false);
+    assert.equal(jobs.getImageJobForUser(other.id, 'usr_cancel_other')?.id, other.id);
 });

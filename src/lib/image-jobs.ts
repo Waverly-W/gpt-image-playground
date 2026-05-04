@@ -1,7 +1,7 @@
-import crypto from 'crypto';
-import { getDb } from './sqlite-db';
 import type { CostDetails, GptImageModel } from './cost-utils';
 import type { ImageStorageMode } from './settings';
+import { getDb } from './sqlite-db';
+import crypto from 'crypto';
 
 export type ImageJobStatus = 'pending' | 'running' | 'completed' | 'failed';
 export type ImageJobMode = 'generate' | 'edit';
@@ -216,9 +216,9 @@ export function failImageJob(id: string, error: string): ImageJob {
 }
 
 export function getImageJobForUser(id: string, ownerUserId: string): ImageJob | null {
-    const row = getDb()
-        .prepare('SELECT * FROM image_jobs WHERE id = ? AND owner_user_id = ?')
-        .get(id, ownerUserId) as ImageJobRow | undefined;
+    const row = getDb().prepare('SELECT * FROM image_jobs WHERE id = ? AND owner_user_id = ?').get(id, ownerUserId) as
+        | ImageJobRow
+        | undefined;
 
     return row ? toImageJob(row) : null;
 }
@@ -234,6 +234,13 @@ export function listImageJobsForUser(ownerUserId: string, limit = 100): ImageJob
 export function deleteImageJobsForUser(ownerUserId: string): number {
     const result = getDb().prepare('DELETE FROM image_jobs WHERE owner_user_id = ?').run(ownerUserId);
     return result.changes;
+}
+
+export function cancelPendingImageJobForUser(id: string, ownerUserId: string): boolean {
+    const result = getDb()
+        .prepare("DELETE FROM image_jobs WHERE id = ? AND owner_user_id = ? AND status = 'pending'")
+        .run(id, ownerUserId);
+    return result.changes > 0;
 }
 
 export function countRunningImageJobs(): number {

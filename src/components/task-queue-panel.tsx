@@ -34,6 +34,7 @@ export type QueueImageJob = {
 type TaskQueuePanelProps = {
     jobs: QueueImageJob[];
     onClearQueue: () => void;
+    onCancelPendingJob: (jobId: string) => void;
 };
 
 const statusMeta = {
@@ -154,7 +155,7 @@ function JobPreview({ job }: { job: QueueImageJob }) {
     );
 }
 
-export function TaskQueuePanel({ jobs, onClearQueue }: TaskQueuePanelProps) {
+export function TaskQueuePanel({ jobs, onClearQueue, onCancelPendingJob }: TaskQueuePanelProps) {
     return (
         <Card className='flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-neutral-950'>
             <CardHeader className='flex flex-row items-center justify-between gap-3 border-b border-white/10 px-4 py-4'>
@@ -213,6 +214,19 @@ export function TaskQueuePanel({ jobs, onClearQueue }: TaskQueuePanelProps) {
                                     </div>
                                     {job.status === 'failed' && job.error && (
                                         <p className='text-xs leading-5 text-red-300'>{job.error}</p>
+                                    )}
+                                    {job.status === 'pending' && (
+                                        <div>
+                                            <Button
+                                                type='button'
+                                                variant='ghost'
+                                                size='sm'
+                                                onClick={() => onCancelPendingJob(job.id)}
+                                                className='h-8 rounded-md px-2 text-white/60 hover:bg-red-500/10 hover:text-red-200'>
+                                                <XCircle className='mr-1.5 h-4 w-4' />
+                                                取消生成
+                                            </Button>
+                                        </div>
                                     )}
                                 </div>
                             </article>
