@@ -3,7 +3,7 @@ import type { PromptCatalogItem, PromptOutputLanguage, PromptTextPolicy } from '
 export const SCENE_CATALOG: PromptCatalogItem[] = [
     {
         id: 'poster',
-        name: 'Poster',
+        name: '海报',
         description: 'A designed poster with a clear focal idea, hierarchy, and composition.',
         promptModifier:
             'Build a poster composition with a strong visual hierarchy, intentional spacing, and one memorable focal point.',
@@ -12,7 +12,7 @@ export const SCENE_CATALOG: PromptCatalogItem[] = [
     },
     {
         id: 'product',
-        name: 'Product Board',
+        name: '产品板',
         description: 'A product image or concept board focused on object presentation.',
         promptModifier:
             'Present the product clearly with controlled lighting, useful detail, and a polished commercial layout.',
@@ -21,7 +21,7 @@ export const SCENE_CATALOG: PromptCatalogItem[] = [
     },
     {
         id: 'character',
-        name: 'Character Sheet',
+        name: '角色设定',
         description: 'A character design, turnaround, or reference image.',
         promptModifier:
             'Keep the character identity consistent, readable, and suitable for a production reference sheet.',
@@ -30,7 +30,7 @@ export const SCENE_CATALOG: PromptCatalogItem[] = [
     },
     {
         id: 'infographic',
-        name: 'Infographic',
+        name: '信息图',
         description: 'A visual explanation with labels, callouts, and clear information hierarchy.',
         promptModifier:
             'Organize information into readable sections with concise labels, visual flow, and clear relationships.',
@@ -39,7 +39,7 @@ export const SCENE_CATALOG: PromptCatalogItem[] = [
     },
     {
         id: 'cover',
-        name: 'Cover',
+        name: '封面',
         description: 'A cover image for editorial, book, album, or article use.',
         promptModifier:
             'Create a cover-ready layout with a strong central image, clean title zone, and editorial polish.',
@@ -48,7 +48,7 @@ export const SCENE_CATALOG: PromptCatalogItem[] = [
     },
     {
         id: 'social-post',
-        name: 'Social Post',
+        name: '社交图文',
         description: 'A social media image optimized for fast scanning.',
         promptModifier:
             'Make the image immediately scannable with a simple message, strong crop, and mobile-friendly details.',
@@ -57,7 +57,7 @@ export const SCENE_CATALOG: PromptCatalogItem[] = [
     },
     {
         id: 'photo-edit',
-        name: 'Photo Edit',
+        name: '照片编辑',
         description: 'A realistic image edit or enhancement.',
         promptModifier:
             'Preserve the believable camera perspective, lighting continuity, texture, and subject identity.',
@@ -66,7 +66,7 @@ export const SCENE_CATALOG: PromptCatalogItem[] = [
     },
     {
         id: 'repaint',
-        name: 'Repaint',
+        name: '局部重绘',
         description: 'A masked repaint or localized regeneration task.',
         promptModifier:
             'Regenerate only the requested area while matching surrounding lighting, perspective, texture, and style.',
@@ -78,34 +78,34 @@ export const SCENE_CATALOG: PromptCatalogItem[] = [
 export const STYLE_CATALOG: PromptCatalogItem[] = [
     {
         id: 'minimal',
-        name: 'Minimal',
+        name: '极简',
         description: 'Restrained, clean, and precise.',
         promptModifier:
             'Use a restrained visual system, clean geometry, generous spacing, precise alignment, and minimal clutter.'
     },
     {
         id: 'editorial',
-        name: 'Editorial',
+        name: '编辑风',
         description: 'Magazine-like layout and art direction.',
         promptModifier:
             'Use editorial art direction with confident composition, refined typography zones, and polished visual rhythm.'
     },
     {
         id: 'retro',
-        name: 'Retro',
+        name: '复古',
         description: 'Vintage color, texture, and graphic language.',
         promptModifier:
             'Use a retro graphic language with period-aware color, tactile print texture, and composed nostalgia.'
     },
     {
         id: 'cinematic',
-        name: 'Cinematic',
+        name: '电影感',
         description: 'Film-like lighting, mood, and framing.',
         promptModifier: 'Use cinematic framing, motivated lighting, atmospheric depth, and coherent film still detail.'
     },
     {
         id: 'technical',
-        name: 'Technical',
+        name: '技术图解',
         description: 'Precise diagrams, labels, and production clarity.',
         promptModifier:
             'Use precise technical illustration, clean annotations, controlled linework, and unambiguous structure.'

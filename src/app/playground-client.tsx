@@ -469,7 +469,7 @@ export default function ImagePlaygroundClient({
                                     <Alert
                                         variant='destructive'
                                         className='mb-4 border-red-500/50 bg-red-900/20 text-red-300'>
-                                        <AlertTitle className='text-red-200'>Error</AlertTitle>
+                                        <AlertTitle className='text-red-200'>错误</AlertTitle>
                                         <AlertDescription>{error}</AlertDescription>
                                     </Alert>
                                 )}

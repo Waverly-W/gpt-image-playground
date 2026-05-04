@@ -40,7 +40,7 @@ export function PromptTemplateGallery({ templates, scenes, onImportPrompt }: Pro
                 <div className='space-y-1'>
                     <div className='flex items-center gap-2 text-white/70'>
                         <WandSparkles className='h-4 w-4' aria-hidden='true' />
-                        <span className='text-xs tracking-normal uppercase'>Prompt Templates</span>
+                        <span className='text-xs tracking-normal'>提示词模板</span>
                     </div>
                     <h2 id='prompt-template-gallery-title' className='text-xl font-medium text-white'>
                         GPT Image 提示词画廊

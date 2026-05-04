@@ -119,10 +119,23 @@ const TEXT_POLICY_OPTIONS: Array<{ value: PromptTextPolicy; label: string }> = [
 const LANGUAGE_OPTIONS: Array<{ value: PromptOutputLanguage; label: string }> = [
     { value: 'auto', label: '自动' },
     { value: 'zh', label: '中文' },
-    { value: 'en', label: 'English' },
-    { value: 'ja', label: '日本語' },
-    { value: 'ko', label: '한국어' }
+    { value: 'en', label: '英文' },
+    { value: 'ja', label: '日文' },
+    { value: 'ko', label: '韩文' }
 ];
+
+const BLOCK_TITLE_LABELS: Record<string, string> = {
+    TASK: '任务',
+    SPECS: '规格',
+    DESC: '描述',
+    STYLE: '风格',
+    'TEXT POLICY': '文字策略',
+    QUALITY: '质量'
+};
+
+function getBlockTitleLabel(title: string): string {
+    return BLOCK_TITLE_LABELS[title] ?? title;
+}
 
 const RadioItemWithIcon = ({
     value,
@@ -594,7 +607,7 @@ export function GenerationForm({
                                                     ? 'bg-white text-black'
                                                     : 'text-white/65 hover:bg-white/10 hover:text-white'
                                             } disabled:cursor-not-allowed disabled:opacity-50`}>
-                                            Free
+                                            自由
                                         </button>
                                         <button
                                             type='button'
@@ -607,7 +620,7 @@ export function GenerationForm({
                                                     ? 'bg-white text-black'
                                                     : 'text-white/65 hover:bg-white/10 hover:text-white'
                                             } disabled:cursor-not-allowed disabled:opacity-50`}>
-                                            Guided
+                                            引导
                                         </button>
                                     </div>
                                 </div>
@@ -732,9 +745,9 @@ export function GenerationForm({
 
                                     <div className='space-y-2 rounded-md border border-white/10 bg-black p-3'>
                                         <div className='flex items-center justify-between gap-3'>
-                                            <Label className='text-xs font-medium text-white'>Prompt Inspector</Label>
+                                            <Label className='text-xs font-medium text-white'>提示词检查器</Label>
                                             <span className='text-xs text-white/45'>
-                                                {builtPrompt.blocks.length} blocks
+                                                {builtPrompt.blocks.length} 个控制块
                                             </span>
                                         </div>
                                         <pre className='max-h-44 overflow-y-auto rounded border border-white/10 bg-neutral-950 p-2 text-xs leading-5 break-words whitespace-pre-wrap text-white/70'>
@@ -745,7 +758,7 @@ export function GenerationForm({
                                                 <span
                                                     key={promptBlock.id}
                                                     className='rounded border border-white/10 px-1.5 py-0.5 text-[11px] text-white/55'>
-                                                    {promptBlock.title}
+                                                    {getBlockTitleLabel(promptBlock.title)}
                                                 </span>
                                             ))}
                                         </div>
