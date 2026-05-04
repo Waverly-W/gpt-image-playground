@@ -213,6 +213,9 @@ export default function ImagePlaygroundClient({
         editImageFiles.forEach((file, index) => {
             apiFormData.append(`image_${index}`, file, file.name);
         });
+        (formData as EditingFormData).imageRoles.forEach((role, index) => {
+            apiFormData.append(`image_role_${index}`, role);
+        });
         if (editGeneratedMaskFile) {
             apiFormData.append('mask', editGeneratedMaskFile, editGeneratedMaskFile.name);
         }

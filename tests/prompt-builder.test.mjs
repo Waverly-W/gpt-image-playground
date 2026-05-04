@@ -92,3 +92,37 @@ test('builds server-authoritative prompt metadata from FormData', () => {
     );
     assert.deepEqual(params.prompt_warnings, []);
 });
+
+test('edit form data wraps prompt with reference image roles', () => {
+    const formData = new FormData();
+    formData.append('mode', 'edit');
+    formData.append('prompt', '把主体换成雨夜电影感，但不要改变人物身份。');
+    formData.append('image_role_0', 'source-image');
+    formData.append('image_role_1', 'style-reference');
+    formData.append('image_role_2', 'layout-reference');
+
+    const built = promptBuilder.buildPromptFromFormData(formData);
+    const params = promptBuilder.serializeBuiltPromptForParams(built);
+
+    assert.match(built.fullPrompt, /^\*\*EDIT TASK\*\*: Modify the provided source image/);
+    assert.match(built.fullPrompt, /\*\*SOURCE IMAGE\*\*: Image 1 is the primary subject\/content source\./);
+    assert.match(built.fullPrompt, /\*\*STYLE REFERENCE\*\*: Image 2 provides style only/);
+    assert.match(built.fullPrompt, /\*\*LAYOUT REFERENCE\*\*: Image 3 provides layout\/composition only/);
+    assert.match(built.fullPrompt, /\*\*EDIT INSTRUCTION\*\*: 把主体换成雨夜电影感/);
+    assert.deepEqual(params.reference_image_roles, ['source-image', 'style-reference', 'layout-reference']);
+});
+
+test('edit form data applies repaint mask policy when a mask is present', () => {
+    const formData = new FormData();
+    formData.append('mode', 'edit');
+    formData.append('prompt', 'Regenerate this area seamlessly.');
+    formData.append('image_role_0', 'source-image');
+    formData.append('mask', new File(['mask'], 'mask.png', { type: 'image/png' }));
+
+    const built = promptBuilder.buildPromptFromFormData(formData);
+
+    assert.match(built.fullPrompt, /\*\*REPAINT INSTRUCTION\*\*: Regenerate this area seamlessly\./);
+    assert.match(built.fullPrompt, /\*\*MASK POLICY\*\*: Change only the masked area/);
+    assert.match(built.fullPrompt, /Preserve all unmasked regions exactly/);
+    assert.match(built.fullPrompt, /blend seamlessly with lighting, perspective, texture, and style/);
+});

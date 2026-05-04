@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { GptImageModel } from '@/lib/cost-utils';
 import { IMAGE_MODEL_OPTIONS } from '@/lib/image-models';
+import type { ReferenceImageRole } from '@/lib/prompt-builder/types';
 import { getPresetTooltip, validateGptImage2Size } from '@/lib/size-utils';
 import type { SizePreset } from '@/lib/size-utils';
 import {
@@ -51,6 +52,7 @@ export type EditingFormData = {
     customHeight: number;
     quality: 'low' | 'medium' | 'high' | 'auto';
     imageFiles: File[];
+    imageRoles: ReferenceImageRole[];
     maskFile: File | null;
     model: GptImageModel;
 };
@@ -98,6 +100,18 @@ type EditingFormProps = {
     partialImages: 1 | 2 | 3;
     setPartialImages: React.Dispatch<React.SetStateAction<1 | 2 | 3>>;
 };
+
+const REFERENCE_IMAGE_ROLE_OPTIONS: Array<{ value: ReferenceImageRole; label: string }> = [
+    { value: 'source-image', label: '源图' },
+    { value: 'style-reference', label: '风格参考' },
+    { value: 'color-reference', label: '色彩参考' },
+    { value: 'layout-reference', label: '构图参考' },
+    { value: 'content-asset', label: '内容素材' }
+];
+
+function getDefaultImageRole(index: number): ReferenceImageRole {
+    return index === 0 ? 'source-image' : 'content-asset';
+}
 
 const RadioItemWithIcon = ({
     value,
@@ -167,6 +181,7 @@ export function EditingForm({
     setPartialImages
 }: EditingFormProps) {
     const [firstImagePreviewUrl, setFirstImagePreviewUrl] = React.useState<string | null>(null);
+    const [imageRoles, setImageRoles] = React.useState<ReferenceImageRole[]>([]);
 
     const isGptImage2 = editModel === 'gpt-image-2';
     const customSizeValidation =
@@ -202,6 +217,10 @@ export function EditingForm({
             visualFeedbackCanvasRef.current.height = editOriginalImageSize.height;
         }
     }, [editOriginalImageSize]);
+
+    React.useEffect(() => {
+        setImageRoles((prevRoles) => imageFiles.map((_, index) => prevRoles[index] ?? getDefaultImageRole(index)));
+    }, [imageFiles]);
 
     React.useEffect(() => {
         setEditGeneratedMaskFile(null);
@@ -409,6 +428,15 @@ export function EditingForm({
     const handleRemoveImage = (indexToRemove: number) => {
         setImageFiles((prevFiles) => prevFiles.filter((_, index) => index !== indexToRemove));
         setSourceImagePreviewUrls((prevUrls) => prevUrls.filter((_, index) => index !== indexToRemove));
+        setImageRoles((prevRoles) => prevRoles.filter((_, index) => index !== indexToRemove));
+    };
+
+    const handleImageRoleChange = (indexToUpdate: number, role: ReferenceImageRole) => {
+        setImageRoles((prevRoles) =>
+            imageFiles.map((_, index) =>
+                index === indexToUpdate ? role : (prevRoles[index] ?? getDefaultImageRole(index))
+            )
+        );
     };
 
     const handleMaskFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -487,6 +515,7 @@ export function EditingForm({
             customHeight: editCustomHeight,
             quality: editQuality,
             imageFiles: imageFiles,
+            imageRoles,
             maskFile: editGeneratedMaskFile,
             model: editModel
         };
@@ -663,24 +692,48 @@ export function EditingForm({
                         {sourceImagePreviewUrls.length > 0 && (
                             <div className='flex space-x-2 overflow-x-auto pt-2'>
                                 {sourceImagePreviewUrls.map((url, index) => (
-                                    <div key={url} className='relative shrink-0'>
-                                        <Image
-                                            src={url}
-                                            alt={`源图片预览 ${index + 1}`}
-                                            width={80}
-                                            height={80}
-                                            className='rounded border border-white/10 object-cover'
-                                            unoptimized
-                                        />
-                                        <Button
-                                            type='button'
-                                            variant='destructive'
-                                            size='icon'
-                                            className='absolute top-0 right-0 h-5 w-5 translate-x-1/3 -translate-y-1/3 transform rounded-full bg-red-600 p-0.5 text-white hover:bg-red-700'
-                                            onClick={() => handleRemoveImage(index)}
-                                            aria-label={`移除图片 ${index + 1}`}>
-                                            <X className='h-3 w-3' />
-                                        </Button>
+                                    <div key={url} className='w-28 shrink-0 space-y-2'>
+                                        <div className='relative'>
+                                            <Image
+                                                src={url}
+                                                alt={`源图片预览 ${index + 1}`}
+                                                width={112}
+                                                height={112}
+                                                className='aspect-square rounded border border-white/10 object-cover'
+                                                unoptimized
+                                            />
+                                            <Button
+                                                type='button'
+                                                variant='destructive'
+                                                size='icon'
+                                                className='absolute top-0 right-0 h-5 w-5 translate-x-1/3 -translate-y-1/3 transform rounded-full bg-red-600 p-0.5 text-white hover:bg-red-700'
+                                                onClick={() => handleRemoveImage(index)}
+                                                aria-label={`移除图片 ${index + 1}`}>
+                                                <X className='h-3 w-3' />
+                                            </Button>
+                                        </div>
+                                        <Select
+                                            value={imageRoles[index] ?? getDefaultImageRole(index)}
+                                            onValueChange={(value) =>
+                                                handleImageRoleChange(index, value as ReferenceImageRole)
+                                            }
+                                            disabled={isLoading}>
+                                            <SelectTrigger
+                                                aria-label={`图片 ${index + 1} 角色`}
+                                                className='h-8 rounded-md border border-white/20 bg-black px-2 text-xs text-white focus:border-white/50 focus:ring-white/50'>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className='z-[100] border-white/20 bg-black text-white'>
+                                                {REFERENCE_IMAGE_ROLE_OPTIONS.map((option) => (
+                                                    <SelectItem
+                                                        key={option.value}
+                                                        value={option.value}
+                                                        className='focus:bg-white/10'>
+                                                        {option.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                 ))}
                             </div>

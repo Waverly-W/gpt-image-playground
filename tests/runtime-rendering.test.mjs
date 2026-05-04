@@ -84,6 +84,17 @@ test('prompt template gallery imports templates as guided prompt configs', () =>
     assert.match(playgroundClient, /setGenPrompt\(template\.promptBuilderConfig\.rawDescription\)/);
 });
 
+test('edit mode submits semantic reference image roles', () => {
+    const editingForm = fs.readFileSync(new URL('../src/components/editing-form.tsx', import.meta.url), 'utf8');
+
+    assert.match(editingForm, /ReferenceImageRole/);
+    assert.match(editingForm, /imageRoles/);
+    assert.match(editingForm, /source-image/);
+    assert.match(editingForm, /style-reference/);
+    assert.match(editingForm, /layout-reference/);
+    assert.match(playgroundClient, /apiFormData\.append\(`image_role_\$\{index\}`, role\)/);
+});
+
 test('task queue exposes cancellation for pending jobs', () => {
     const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
     const jobRoute = fs.readFileSync(new URL('../src/app/api/image-jobs/[id]/route.ts', import.meta.url), 'utf8');

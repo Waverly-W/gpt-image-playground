@@ -18,6 +18,13 @@ export type PromptOutputLanguage = 'zh' | 'en' | 'ja' | 'ko' | 'auto';
 
 export type PromptTextPolicy = 'no-text' | 'allow-short-text' | 'text-first' | 'structured-labels';
 
+export type ReferenceImageRole =
+    | 'source-image'
+    | 'style-reference'
+    | 'color-reference'
+    | 'layout-reference'
+    | 'content-asset';
+
 export type PromptDesignTokens = {
     enabled: boolean;
     aiColor?: boolean;
@@ -62,6 +69,7 @@ export type BuiltPrompt = {
     builderConfig: PromptBuilderConfig;
     blocks: PromptBlock[];
     warnings: string[];
+    referenceImageRoles?: ReferenceImageRole[];
 };
 
 export type PromptCatalogItem = {

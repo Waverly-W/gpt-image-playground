@@ -1,5 +1,6 @@
 import { findScene, findStyle, LANGUAGE_PROMPTS, TEXT_POLICY_PROMPTS } from './catalogs';
 import { cleanupPromptText, normalizePromptBuilderConfig } from './cleanup';
+import { getReferenceImageRolesFromFormData, wrapEditPrompt } from './edit-prompt';
 import type { BuiltPrompt, PromptBlock, PromptBuilderConfig } from './types';
 
 function block(id: string, title: string, content: string): PromptBlock {
@@ -120,8 +121,17 @@ export function buildPromptFromFormData(formData: FormData): BuiltPrompt {
         size: String(parsed.config?.size ?? formData.get('size') ?? '') || undefined
     } satisfies PromptBuilderConfig;
     const built = buildPrompt(config);
+    const builtWithWarnings = parsed.warning ? { ...built, warnings: [parsed.warning, ...built.warnings] } : built;
+    const mode = formData.get('mode');
+    if (mode === 'edit') {
+        return wrapEditPrompt({
+            builtPrompt: builtWithWarnings,
+            referenceImageRoles: getReferenceImageRolesFromFormData(formData),
+            hasMask: formData.get('mask') instanceof File
+        });
+    }
 
-    return parsed.warning ? { ...built, warnings: [parsed.warning, ...built.warnings] } : built;
+    return builtWithWarnings;
 }
 
 export function serializeBuiltPromptForParams(builtPrompt: BuiltPrompt): Record<string, unknown> {
@@ -131,6 +141,7 @@ export function serializeBuiltPromptForParams(builtPrompt: BuiltPrompt): Record<
         full_prompt: builtPrompt.fullPrompt,
         prompt_builder_config: builtPrompt.builderConfig,
         prompt_blocks: builtPrompt.blocks,
-        prompt_warnings: builtPrompt.warnings
+        prompt_warnings: builtPrompt.warnings,
+        ...(builtPrompt.referenceImageRoles ? { reference_image_roles: builtPrompt.referenceImageRoles } : {})
     };
 }
