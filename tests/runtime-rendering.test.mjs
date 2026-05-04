@@ -68,6 +68,10 @@ test('task queue exposes quality feedback controls for completed jobs', () => {
 
     assert.match(taskQueuePanel, /QUALITY_FAILURE_REASON_OPTIONS/);
     assert.match(taskQueuePanel, /质量反馈/);
+    assert.match(taskQueuePanel, /DialogTrigger/);
+    assert.match(taskQueuePanel, /DialogContent/);
+    assert.match(taskQueuePanel, /aria-label='记录质量反馈'/);
+    assert.match(taskQueuePanel, /MessageSquareWarning/);
     assert.match(qualityFeedback, /文字错/);
     assert.match(qualityFeedback, /构图错/);
     assert.match(qualityFeedback, /风格错/);
@@ -76,6 +80,7 @@ test('task queue exposes quality feedback controls for completed jobs', () => {
     assert.match(qualityFeedback, /信息密度不对/);
     assert.match(taskQueuePanel, /onUpdateQualityFeedback/);
     assert.match(taskQueuePanel, /job\.status === 'completed'/);
+    assert.doesNotMatch(taskQueuePanel, /job\.status === 'completed' && \(\s*<div className='sm:pl-\[6\.75rem\]'>\s*<QualityFeedbackPanel/);
     assert.match(playgroundClient, /handleUpdateQualityFeedback/);
     assert.match(playgroundClient, /method: 'PATCH'/);
     assert.match(jobRoute, /updateImageJobQualityFeedbackForUser/);
@@ -112,7 +117,6 @@ test('task queue image preview uses Ant Design preview group', () => {
 
     assert.match(taskQueuePanel, /import \{ Image as AntImage \} from 'antd'/);
     assert.match(taskQueuePanel, /<AntImage\.PreviewGroup/);
-    assert.doesNotMatch(taskQueuePanel, /DialogContent/);
 });
 
 test('task queue renders clickable streaming preview images', () => {

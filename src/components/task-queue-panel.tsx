@@ -3,6 +3,15 @@
 import { PromptInspector, type PromptInspectorBlock } from '@/components/prompt-inspector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger
+} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import type { CostDetails, GptImageModel } from '@/lib/cost-utils';
 import {
@@ -12,7 +21,17 @@ import {
     type ImageQualityFailureReason
 } from '@/lib/image-quality-feedback';
 import { Image as AntImage } from 'antd';
-import { CheckCircle2, Clock3, Cloud, ImageIcon, Layers, Loader2, Trash2, XCircle } from 'lucide-react';
+import {
+    CheckCircle2,
+    Clock3,
+    Cloud,
+    ImageIcon,
+    Layers,
+    Loader2,
+    MessageSquareWarning,
+    Trash2,
+    XCircle
+} from 'lucide-react';
 import * as React from 'react';
 
 export type QueueImageJob = {
@@ -228,6 +247,7 @@ function QualityFeedbackPanel({
     const [note, setNote] = React.useState(savedNote);
     const [isSaving, setIsSaving] = React.useState(false);
     const [isDirty, setIsDirty] = React.useState(false);
+    const [isOpen, setIsOpen] = React.useState(false);
 
     React.useEffect(() => {
         if (isDirty) return;
@@ -250,59 +270,79 @@ function QualityFeedbackPanel({
         try {
             await onUpdateQualityFeedback(job.id, { failureReasons: selectedReasons, note });
             setIsDirty(false);
+            setIsOpen(false);
         } finally {
             setIsSaving(false);
         }
     };
 
     return (
-        <div className='rounded-md border border-white/10 bg-black/70 p-3'>
-            <div className='mb-2 flex flex-wrap items-center justify-between gap-2'>
-                <div>
-                    <h4 className='text-xs font-medium text-white'>质量反馈</h4>
-                    {savedFeedback?.updatedAt && (
-                        <p className='mt-1 text-xs text-white/40'>已记录：{formatTime(savedFeedback.updatedAt)}</p>
-                    )}
-                </div>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
                 <Button
                     type='button'
-                    size='sm'
                     variant='ghost'
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className='h-8 rounded-md px-2 text-white/65 hover:bg-white/10 hover:text-white disabled:text-white/35'>
-                    {isSaving ? '保存中...' : '保存反馈'}
+                    size='icon'
+                    aria-label='记录质量反馈'
+                    className={`h-8 w-8 rounded-md hover:bg-white/10 hover:text-white ${
+                        savedFeedback
+                            ? 'text-amber-200/65 hover:text-amber-100'
+                            : 'text-white/35 hover:text-white/70'
+                    }`}>
+                    <MessageSquareWarning className='h-4 w-4' />
                 </Button>
-            </div>
-            <div className='flex flex-wrap gap-1.5'>
-                {QUALITY_FAILURE_REASON_OPTIONS.map((option) => {
-                    const selected = selectedReasons.includes(option.id);
+            </DialogTrigger>
+            <DialogContent className='border-neutral-700 bg-neutral-900 text-white sm:max-w-[520px]'>
+                <DialogHeader>
+                    <DialogTitle className='text-white'>质量反馈</DialogTitle>
+                    <DialogDescription className='text-neutral-400'>
+                        记录生成失败原因，用于后续优化 Prompt Builder。
+                    </DialogDescription>
+                </DialogHeader>
+                <div className='space-y-3'>
+                    {savedFeedback?.updatedAt && (
+                        <p className='text-xs text-white/40'>已记录：{formatTime(savedFeedback.updatedAt)}</p>
+                    )}
+                    <div className='flex flex-wrap gap-1.5'>
+                        {QUALITY_FAILURE_REASON_OPTIONS.map((option) => {
+                            const selected = selectedReasons.includes(option.id);
 
-                    return (
-                        <button
-                            key={option.id}
-                            type='button'
-                            onClick={() => toggleReason(option.id)}
-                            className={`rounded border px-2 py-1 text-xs transition-colors ${
-                                selected
-                                    ? 'border-amber-300/50 bg-amber-300/15 text-amber-100'
-                                    : 'border-white/10 text-white/55 hover:border-white/25 hover:text-white'
-                            }`}>
-                            {option.label}
-                        </button>
-                    );
-                })}
-            </div>
-            <Textarea
-                value={note}
-                onChange={(event) => {
-                    setIsDirty(true);
-                    setNote(event.target.value);
-                }}
-                placeholder='补充失败现象，后续用于优化 Prompt Builder。'
-                className='mt-2 min-h-16 rounded-md border border-white/10 bg-neutral-950 text-xs text-white placeholder:text-white/35 focus:border-white/30 focus:ring-white/30'
-            />
-        </div>
+                            return (
+                                <button
+                                    key={option.id}
+                                    type='button'
+                                    onClick={() => toggleReason(option.id)}
+                                    className={`rounded border px-2 py-1 text-xs transition-colors ${
+                                        selected
+                                            ? 'border-amber-300/50 bg-amber-300/15 text-amber-100'
+                                            : 'border-white/10 text-white/55 hover:border-white/25 hover:text-white'
+                                    }`}>
+                                    {option.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <Textarea
+                        value={note}
+                        onChange={(event) => {
+                            setIsDirty(true);
+                            setNote(event.target.value);
+                        }}
+                        placeholder='补充失败现象，后续用于优化 Prompt Builder。'
+                        className='min-h-24 rounded-md border border-white/10 bg-neutral-950 text-sm text-white placeholder:text-white/35 focus:border-white/30 focus:ring-white/30'
+                    />
+                </div>
+                <DialogFooter>
+                    <Button
+                        type='button'
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className='rounded-md bg-white text-black hover:bg-white/90 disabled:bg-white/10 disabled:text-white/35'>
+                        {isSaving ? '保存中...' : '保存反馈'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -351,19 +391,27 @@ export function TaskQueuePanel({
                                     <div className='flex items-start gap-3'>
                                         <JobPreview job={job} />
                                         <div className='flex min-w-0 flex-1 flex-col gap-2'>
-                                            <div className='flex flex-wrap items-center gap-2'>
-                                                <TaskStatusBadge status={job.status} />
-                                                <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
-                                                    {job.mode === 'edit' ? '编辑' : '生成'}
-                                                </span>
-                                                <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
-                                                    {job.model}
-                                                </span>
-                                                {job.storageModeUsed === 'r2' && (
-                                                    <span className='inline-flex items-center gap-1 rounded-full border border-orange-400/30 bg-orange-500/10 px-2 py-0.5 text-xs text-orange-200'>
-                                                        <Cloud className='h-3.5 w-3.5' />
-                                                        R2
+                                            <div className='flex items-start justify-between gap-2'>
+                                                <div className='flex flex-wrap items-center gap-2'>
+                                                    <TaskStatusBadge status={job.status} />
+                                                    <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
+                                                        {job.mode === 'edit' ? '编辑' : '生成'}
                                                     </span>
+                                                    <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-white/55'>
+                                                        {job.model}
+                                                    </span>
+                                                    {job.storageModeUsed === 'r2' && (
+                                                        <span className='inline-flex items-center gap-1 rounded-full border border-orange-400/30 bg-orange-500/10 px-2 py-0.5 text-xs text-orange-200'>
+                                                            <Cloud className='h-3.5 w-3.5' />
+                                                            R2
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {job.status === 'completed' && (
+                                                    <QualityFeedbackPanel
+                                                        job={job}
+                                                        onUpdateQualityFeedback={onUpdateQualityFeedback}
+                                                    />
                                                 )}
                                             </div>
                                             <p className='line-clamp-2 text-sm leading-5 text-white/85'>{job.prompt}</p>
@@ -401,14 +449,6 @@ export function TaskQueuePanel({
                                                 warnings={promptInspectorData.warnings}
                                                 defaultOpen={false}
                                                 compact
-                                            />
-                                        </div>
-                                    )}
-                                    {job.status === 'completed' && (
-                                        <div className='sm:pl-[6.75rem]'>
-                                            <QualityFeedbackPanel
-                                                job={job}
-                                                onUpdateQualityFeedback={onUpdateQualityFeedback}
                                             />
                                         </div>
                                     )}
