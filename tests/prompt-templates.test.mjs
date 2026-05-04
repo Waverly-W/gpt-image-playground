@@ -31,6 +31,15 @@ test('loads GPT image prompt templates with local gallery image URLs', () => {
         '/api/prompt-template-images/ai-outfit-upgrade-report__french-parisian-style-reset.webp'
     );
     assert.match(first.prompt, /French Parisian understated style upgrade report/);
+    assert.deepEqual(first.promptBuilderConfig, {
+        promptMode: 'guided',
+        rawDescription: first.prompt,
+        sceneId: 'style-report',
+        styleId: 'editorial',
+        aspectRatio: '16:9',
+        textPolicy: 'structured-labels',
+        outputLanguage: 'auto'
+    });
 });
 
 test('resolves only known prompt template image filenames from docs directory', () => {
@@ -86,4 +95,16 @@ test('omits bucket segment from R2 custom domain template URLs', () => {
         templates[0].imageUrl,
         'https://pic.waverlywang.top/prompt-templates/ai-outfit-upgrade-report__french-parisian-style-reset.webp'
     );
+});
+
+test('maps prompt template scenes to guided builder configs', () => {
+    const templates = promptTemplates.PROMPT_TEMPLATES;
+    const bySlug = new Map(templates.map((template) => [template.sceneSlug, template]));
+
+    assert.equal(bySlug.get('big-type-posters')?.promptBuilderConfig.sceneId, 'poster');
+    assert.equal(bySlug.get('evolution-history-infographics')?.promptBuilderConfig.sceneId, 'infographic');
+    assert.equal(bySlug.get('character-design-charts')?.promptBuilderConfig.sceneId, 'character');
+    assert.equal(bySlug.get('biomimicry-product-concepts')?.promptBuilderConfig.sceneId, 'product');
+    assert.equal(bySlug.get('cutaway-educational-picture-books')?.promptBuilderConfig.sceneId, 'educational');
+    assert.equal(bySlug.get('double-exposure-character-posters')?.promptBuilderConfig.sceneId, 'portrait');
 });

@@ -76,6 +76,14 @@ test('playground supports CSV batch generation through the existing job queue', 
     assert.match(playgroundClient, /Promise\.all\(\s*rows\.map/);
 });
 
+test('prompt template gallery imports templates as guided prompt configs', () => {
+    assert.match(promptTemplateGallery, /onImportTemplate/);
+    assert.match(promptTemplateGallery, /template\.promptBuilderConfig/);
+    assert.doesNotMatch(promptTemplateGallery, /onImportPrompt\(template\.prompt\)/);
+    assert.match(playgroundClient, /handleImportPromptTemplate = React\.useCallback\(\(template: PromptTemplate\)/);
+    assert.match(playgroundClient, /setGenPrompt\(template\.promptBuilderConfig\.rawDescription\)/);
+});
+
 test('task queue exposes cancellation for pending jobs', () => {
     const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
     const jobRoute = fs.readFileSync(new URL('../src/app/api/image-jobs/[id]/route.ts', import.meta.url), 'utf8');

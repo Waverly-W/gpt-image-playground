@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SCENE_CATALOG, STYLE_CATALOG } from '@/lib/prompt-builder/catalogs';
+import type { PromptTextPolicy } from '@/lib/prompt-builder/types';
 import type { PromptTemplate, PromptTemplateScene } from '@/lib/prompt-template-data';
 import { Image as AntImage } from 'antd';
 import { ImagePlus, Search, WandSparkles } from 'lucide-react';
@@ -12,10 +14,25 @@ import * as React from 'react';
 type PromptTemplateGalleryProps = {
     templates: Array<PromptTemplate & { imageUrl: string }>;
     scenes: PromptTemplateScene[];
-    onImportPrompt: (prompt: string) => void;
+    onImportTemplate: (template: PromptTemplate) => void;
 };
 
-export function PromptTemplateGallery({ templates, scenes, onImportPrompt }: PromptTemplateGalleryProps) {
+const TEXT_POLICY_LABELS: Record<PromptTextPolicy, string> = {
+    'no-text': '无文字',
+    'allow-short-text': '短文字',
+    'text-first': '文字优先',
+    'structured-labels': '结构标签'
+};
+
+function getSceneLabel(sceneId: string | undefined): string {
+    return SCENE_CATALOG.find((scene) => scene.id === sceneId)?.name || '场景';
+}
+
+function getStyleLabel(styleId: string | undefined): string {
+    return STYLE_CATALOG.find((style) => style.id === styleId)?.name || '风格';
+}
+
+export function PromptTemplateGallery({ templates, scenes, onImportTemplate }: PromptTemplateGalleryProps) {
     const [query, setQuery] = React.useState('');
     const [sceneSlug, setSceneSlug] = React.useState('all');
 
@@ -46,7 +63,7 @@ export function PromptTemplateGallery({ templates, scenes, onImportPrompt }: Pro
                         GPT Image 提示词画廊
                     </h2>
                     <p className='max-w-2xl text-sm leading-6 text-white/60'>
-                        浏览 docs 中的 {templates.length} 个参考模板，选择一个后可直接导入到生成提示词。
+                        浏览 docs 中的 {templates.length} 个参考模板，选择一个后可导入为可调节的引导配置。
                     </p>
                 </div>
             </div>
@@ -164,12 +181,25 @@ export function PromptTemplateGallery({ templates, scenes, onImportPrompt }: Pro
                                         <p className='h-20 overflow-hidden text-sm leading-5 text-white/60'>
                                             {template.prompt}
                                         </p>
+                                        <div className='flex flex-wrap gap-1.5 text-[11px] text-white/50'>
+                                            <span className='rounded border border-white/10 px-1.5 py-0.5'>
+                                                {getSceneLabel(template.promptBuilderConfig.sceneId)}
+                                            </span>
+                                            <span className='rounded border border-white/10 px-1.5 py-0.5'>
+                                                {getStyleLabel(template.promptBuilderConfig.styleId)}
+                                            </span>
+                                            <span className='rounded border border-white/10 px-1.5 py-0.5'>
+                                                {template.promptBuilderConfig.textPolicy
+                                                    ? TEXT_POLICY_LABELS[template.promptBuilderConfig.textPolicy]
+                                                    : '文字策略'}
+                                            </span>
+                                        </div>
                                         <Button
                                             type='button'
-                                            onClick={() => onImportPrompt(template.prompt)}
+                                            onClick={() => onImportTemplate(template)}
                                             className='flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-white text-black hover:bg-white/90'>
                                             <ImagePlus className='h-4 w-4' aria-hidden='true' />
-                                            导入提示词
+                                            导入为引导配置
                                         </Button>
                                     </CardContent>
                                 </Card>

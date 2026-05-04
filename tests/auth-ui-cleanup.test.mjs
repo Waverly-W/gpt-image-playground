@@ -67,7 +67,7 @@ test('playground uses a fixed sidebar with image generation and prompt gallery v
   assert.match(playground, /图片生成/);
   assert.match(playground, /提示词画廊/);
   assert.match(playground, /setActiveSection\('generate'\)/);
-  assert.match(playground, /setGenPrompt\(prompt\)/);
+  assert.match(playground, /setGenPrompt\(template\.promptBuilderConfig\.rawDescription\)/);
 });
 
 test('task queue shows an R2 badge for R2-backed image jobs', () => {

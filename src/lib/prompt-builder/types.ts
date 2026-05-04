@@ -2,11 +2,13 @@ export type PromptBuilderMode = 'free' | 'guided';
 
 export type PromptIntentMode =
     | 'poster'
-    | 'product'
-    | 'character'
     | 'infographic'
-    | 'cover'
+    | 'character'
+    | 'product'
+    | 'style-report'
     | 'social-post'
+    | 'educational'
+    | 'portrait'
     | 'photo-edit'
     | 'repaint';
 

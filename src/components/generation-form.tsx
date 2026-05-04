@@ -105,6 +105,7 @@ type GenerationFormProps = {
     setEnableStreaming: React.Dispatch<React.SetStateAction<boolean>>;
     partialImages: 1 | 2 | 3;
     setPartialImages: React.Dispatch<React.SetStateAction<1 | 2 | 3>>;
+    importedPromptBuilderConfig?: PromptBuilderConfig | null;
 };
 
 type GenerationMode = 'single' | 'batch';
@@ -193,7 +194,8 @@ export function GenerationForm({
     enableStreaming,
     setEnableStreaming,
     partialImages,
-    setPartialImages
+    setPartialImages,
+    importedPromptBuilderConfig
 }: GenerationFormProps) {
     const showCompression = outputFormat === 'jpeg' || outputFormat === 'webp';
     const isGptImage2 = model === 'gpt-image-2';
@@ -209,6 +211,16 @@ export function GenerationForm({
     const [outputLanguage, setOutputLanguage] = React.useState<PromptOutputLanguage>('auto');
     const [batchRows, setBatchRows] = React.useState<BatchGenerationRow[]>([]);
     const [batchErrors, setBatchErrors] = React.useState<string[]>([]);
+
+    React.useEffect(() => {
+        if (!importedPromptBuilderConfig) return;
+
+        setPromptMode('guided');
+        setSceneId((importedPromptBuilderConfig.sceneId || 'poster') as PromptIntentMode);
+        setStyleId(importedPromptBuilderConfig.styleId || 'editorial');
+        setTextPolicy(importedPromptBuilderConfig.textPolicy || 'allow-short-text');
+        setOutputLanguage(importedPromptBuilderConfig.outputLanguage || 'auto');
+    }, [importedPromptBuilderConfig]);
 
     const batchDefaults = React.useMemo<BatchGenerationDefaults>(
         () => ({

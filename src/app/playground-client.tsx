@@ -100,6 +100,9 @@ export default function ImagePlaygroundClient({
     const [genCompression, setGenCompression] = React.useState([100]);
     const [genBackground, setGenBackground] = React.useState<GenerationFormData['background']>('auto');
     const [genModeration, setGenModeration] = React.useState<GenerationFormData['moderation']>('auto');
+    const [genImportedPromptBuilderConfig, setGenImportedPromptBuilderConfig] = React.useState<
+        PromptTemplate['promptBuilderConfig'] | null
+    >(null);
 
     const [editModel, setEditModel] = React.useState<EditingFormData['model']>('gpt-image-2');
     const [enableStreaming, setEnableStreaming] = React.useState(false);
@@ -327,10 +330,11 @@ export default function ImagePlaygroundClient({
         setIsMobileSidebarOpen(false);
     }, []);
 
-    const handleImportPromptTemplate = React.useCallback((prompt: string) => {
+    const handleImportPromptTemplate = React.useCallback((template: PromptTemplate) => {
         setActiveSection('generate');
         setMode('generate');
-        setGenPrompt(prompt);
+        setGenPrompt(template.promptBuilderConfig.rawDescription);
+        setGenImportedPromptBuilderConfig(template.promptBuilderConfig);
         setIsMobileSidebarOpen(false);
         formPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, []);
@@ -507,6 +511,7 @@ export default function ImagePlaygroundClient({
                                         setEnableStreaming={setEnableStreaming}
                                         partialImages={partialImages}
                                         setPartialImages={setPartialImages}
+                                        importedPromptBuilderConfig={genImportedPromptBuilderConfig}
                                     />
                                 </div>
                                 <div className={mode === 'edit' ? 'block h-full w-full' : 'hidden'}>
@@ -568,7 +573,7 @@ export default function ImagePlaygroundClient({
                         <PromptTemplateGallery
                             templates={promptTemplates}
                             scenes={promptTemplateScenes}
-                            onImportPrompt={handleImportPromptTemplate}
+                            onImportTemplate={handleImportPromptTemplate}
                         />
                     )}
                 </div>
