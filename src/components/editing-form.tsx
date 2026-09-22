@@ -11,6 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+    createBatchEditCsvTemplate,
+    parseBatchEditCsv,
+    type BatchEditDefaults,
+    type BatchEditRow
+} from '@/lib/batch-csv';
 import type { GptImageModel } from '@/lib/cost-utils';
 import { IMAGE_MODEL_OPTIONS } from '@/lib/image-models';
 import type { ReferenceImageRole } from '@/lib/prompt-builder/types';
@@ -33,7 +39,9 @@ import {
     UploadCloud,
     HelpCircle,
     SquareDashed,
-    Info
+    Info,
+    Download,
+    ListPlus
 } from 'lucide-react';
 import Image from 'next/image';
 import * as React from 'react';
@@ -62,6 +70,8 @@ type EditingFormProps = {
     isLoading: boolean;
     currentMode: 'generate' | 'edit';
     onModeChange: (mode: 'generate' | 'edit') => void;
+    onBatchSubmit: (rows: BatchEditRow[]) => Promise<void>;
+    batchProgress: string | null;
     editModel: EditingFormData['model'];
     setEditModel: React.Dispatch<React.SetStateAction<EditingFormData['model']>>;
     imageFiles: File[];
@@ -99,6 +109,7 @@ type EditingFormProps = {
     setEnableStreaming: React.Dispatch<React.SetStateAction<boolean>>;
     partialImages: 1 | 2 | 3;
     setPartialImages: React.Dispatch<React.SetStateAction<1 | 2 | 3>>;
+    modelOptions?: Array<{ value: string; label: string }>;
 };
 
 const REFERENCE_IMAGE_ROLE_OPTIONS: Array<{ value: ReferenceImageRole; label: string }> = [
@@ -142,6 +153,8 @@ export function EditingForm({
     isLoading,
     currentMode,
     onModeChange,
+    onBatchSubmit,
+    batchProgress,
     editModel,
     setEditModel,
     imageFiles,
@@ -178,15 +191,33 @@ export function EditingForm({
     enableStreaming,
     setEnableStreaming,
     partialImages,
-    setPartialImages
+    setPartialImages,
+    modelOptions
 }: EditingFormProps) {
     const [firstImagePreviewUrl, setFirstImagePreviewUrl] = React.useState<string | null>(null);
     const [imageRoles, setImageRoles] = React.useState<ReferenceImageRole[]>([]);
+    const [editMode, setEditMode] = React.useState<'single' | 'batch'>('single');
+    const [batchRows, setBatchRows] = React.useState<BatchEditRow[]>([]);
+    const [batchErrors, setBatchErrors] = React.useState<string[]>([]);
+    const batchFileInputRef = React.useRef<HTMLInputElement>(null);
 
     const isGptImage2 = editModel === 'gpt-image-2';
     const customSizeValidation =
         editSize === 'custom' ? validateGptImage2Size(editCustomWidth, editCustomHeight) : { valid: true as const };
     const customSizeInvalid = editSize === 'custom' && !customSizeValidation.valid;
+    const batchDefaults = React.useMemo<BatchEditDefaults>(
+        () => ({
+            model: editModel,
+            n: editN[0],
+            size: editSize,
+            customWidth: editCustomWidth,
+            customHeight: editCustomHeight,
+            quality: editQuality,
+            stream: enableStreaming,
+            partial_images: partialImages
+        }),
+        [editModel, editN, editSize, editCustomWidth, editCustomHeight, editQuality, enableStreaming, partialImages]
+    );
 
     // Disable streaming when editN > 1 (OpenAI limitation)
     React.useEffect(() => {
@@ -522,6 +553,35 @@ export function EditingForm({
         onSubmit(formData);
     };
 
+    const handleDownloadBatchTemplate = () => {
+        const template = createBatchEditCsvTemplate(batchDefaults);
+        const blob = new Blob([template], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'image-edit-batch-template.csv';
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleBatchFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const text = await file.text();
+        const result = parseBatchEditCsv(text, batchDefaults);
+        setBatchRows(result.rows);
+        setBatchErrors(result.errors);
+        event.target.value = '';
+    };
+
+    const handleCreateBatchJobs = async () => {
+        if (batchRows.length === 0 || batchErrors.length > 0) return;
+        await onBatchSubmit(batchRows);
+        setBatchRows([]);
+        setBatchErrors([]);
+    };
+
     const displayFileNames = (files: File[]) => {
         if (files.length === 0) return '未选择文件。';
         if (files.length === 1) return files[0].name;
@@ -533,501 +593,658 @@ export function EditingForm({
             <CardHeader className='flex flex-col gap-4 border-b border-white/10 pb-4 sm:flex-row sm:items-start sm:justify-between'>
                 <div className='min-w-0'>
                     <div className='flex items-center'>
-                        <CardTitle className='py-1 text-xl font-semibold text-white'>编辑图片</CardTitle>
+                        <CardTitle className='py-1 text-xl font-semibold text-white'>
+                            {editMode === 'batch' ? '批量编辑' : '编辑图片'}
+                        </CardTitle>
                     </div>
-                    <CardDescription className='mt-1 text-white/60'>使用文字提示词修改现有图片。</CardDescription>
+                    <CardDescription className='mt-1 text-white/60'>
+                        {editMode === 'batch'
+                            ? '导入 CSV 后一次性创建编辑任务，由队列自动调度。'
+                            : '使用文字提示词修改现有图片。'}
+                    </CardDescription>
                 </div>
                 <ModeToggle currentMode={currentMode} onModeChange={onModeChange} />
             </CardHeader>
             <form onSubmit={handleSubmit} className='flex h-full flex-1 flex-col overflow-hidden'>
                 <CardContent className='flex flex-1 flex-col gap-5 overflow-y-auto p-4'>
-                    <div className='flex flex-col gap-1.5'>
-                        <Label htmlFor='edit-model-select' className='text-white'>
-                            模型
-                        </Label>
-                        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4'>
-                            <Select
-                                value={editModel}
-                                onValueChange={(value) => setEditModel(value as EditingFormData['model'])}
-                                disabled={isLoading}>
-                                <SelectTrigger
-                                    id='edit-model-select'
-                                    className='w-full rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50 sm:w-[180px]'>
-                                    <SelectValue placeholder='选择模型' />
-                                </SelectTrigger>
-                                <SelectContent className='z-[100] border-white/20 bg-black text-white'>
-                                    {IMAGE_MODEL_OPTIONS.map((option) => (
-                                        <SelectItem
-                                            key={option.value}
-                                            value={option.value}
-                                            className='focus:bg-white/10'>
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {isGptImage2 && (
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Info className='h-4 w-4 cursor-help text-white/40 hover:text-white/60' />
-                                    </TooltipTrigger>
-                                    <TooltipContent className='max-w-[280px]'>
-                                        gpt-image-2 始终以高保真度处理参考图，可提升编辑质量，但每次请求会比
-                                        gpt-image-1.5 默认保真度消耗更多图片输入 token。
-                                    </TooltipContent>
-                                </Tooltip>
-                            )}
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div className='flex items-center gap-2'>
-                                        <Checkbox
-                                            id='edit-enable-streaming'
-                                            checked={enableStreaming}
-                                            onCheckedChange={(checked) => setEnableStreaming(!!checked)}
-                                            disabled={isLoading || editN[0] > 1}
-                                            className='border-white/40 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-black'
-                                        />
-                                        <Label
-                                            htmlFor='edit-enable-streaming'
-                                            className={`text-sm ${editN[0] > 1 ? 'cursor-not-allowed text-white/40' : 'cursor-pointer text-white/80'}`}>
-                                            启用流式预览
-                                        </Label>
-                                    </div>
-                                </TooltipTrigger>
-                                <TooltipContent className='max-w-[250px]'>
-                                    {editN[0] > 1
-                                        ? '流式预览仅支持一次生成 1 张图片（n=1）。'
-                                        : '生成过程中显示阶段性预览图，交互反馈更及时。'}
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>
-                    </div>
-
-                    {enableStreaming && (
-                        <div className='space-y-3'>
-                            <div className='flex items-center gap-2'>
-                                <Label className='text-white'>预览图片数</Label>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <HelpCircle className='h-4 w-4 cursor-help text-white/40 hover:text-white/60' />
-                                    </TooltipTrigger>
-                                    <TooltipContent className='max-w-[250px]'>
-                                        每张预览图约增加 $0.003 成本（额外 100 个输出 token）。
-                                    </TooltipContent>
-                                </Tooltip>
-                            </div>
-                            <RadioGroup
-                                value={String(partialImages)}
-                                onValueChange={(value) => setPartialImages(Number(value) as 1 | 2 | 3)}
-                                disabled={isLoading}
-                                className='flex gap-x-5'>
-                                <div className='flex items-center space-x-2'>
-                                    <RadioGroupItem
-                                        value='1'
-                                        id='edit-partial-1'
-                                        className='border-white/40 text-white data-[state=checked]:border-white data-[state=checked]:text-white'
-                                    />
-                                    <Label htmlFor='edit-partial-1' className='cursor-pointer text-white/80'>
-                                        1
-                                    </Label>
-                                </div>
-                                <div className='flex items-center space-x-2'>
-                                    <RadioGroupItem
-                                        value='2'
-                                        id='edit-partial-2'
-                                        className='border-white/40 text-white data-[state=checked]:border-white data-[state=checked]:text-white'
-                                    />
-                                    <Label htmlFor='edit-partial-2' className='cursor-pointer text-white/80'>
-                                        2
-                                    </Label>
-                                </div>
-                                <div className='flex items-center space-x-2'>
-                                    <RadioGroupItem
-                                        value='3'
-                                        id='edit-partial-3'
-                                        className='border-white/40 text-white data-[state=checked]:border-white data-[state=checked]:text-white'
-                                    />
-                                    <Label htmlFor='edit-partial-3' className='cursor-pointer text-white/80'>
-                                        3
-                                    </Label>
-                                </div>
-                            </RadioGroup>
-                        </div>
-                    )}
-
-                    <div className='space-y-1.5'>
-                        <Label htmlFor='edit-prompt' className='text-white'>
-                            提示词
-                        </Label>
-                        <Textarea
-                            id='edit-prompt'
-                            placeholder='例如：给主体添加一顶派对帽'
-                            value={editPrompt}
-                            onChange={(e) => setEditPrompt(e.target.value)}
-                            required
-                            disabled={isLoading}
-                            className='min-h-[80px] rounded-md border border-white/20 bg-black text-white placeholder:text-white/40 focus:border-white/50 focus:ring-white/50'
-                        />
-                    </div>
-
-                    <div className='space-y-2'>
-                        <Label className='text-white'>源图片（最多 10 张）</Label>
-                        <Label
-                            htmlFor='image-files-input'
-                            className='flex h-10 w-full cursor-pointer items-center justify-between rounded-md border border-white/20 bg-black px-3 py-2 text-sm transition-colors hover:bg-white/5'>
-                            <span className='truncate pr-2 text-white/60'>{displayFileNames(imageFiles)}</span>
-                            <span className='flex shrink-0 items-center gap-1.5 rounded-md bg-white/10 px-3 py-1 text-xs font-medium text-white/80 hover:bg-white/20'>
-                                <Upload className='h-3 w-3' /> 浏览...
-                            </span>
-                        </Label>
-                        <Input
-                            id='image-files-input'
-                            type='file'
-                            accept='image/png, image/jpeg, image/webp'
-                            multiple
-                            onChange={handleImageFileChange}
-                            disabled={isLoading || imageFiles.length >= maxImages}
-                            className='sr-only'
-                        />
-                        {sourceImagePreviewUrls.length > 0 && (
-                            <div className='flex space-x-2 overflow-x-auto pt-2'>
-                                {sourceImagePreviewUrls.map((url, index) => (
-                                    <div key={url} className='w-28 shrink-0 space-y-2'>
-                                        <div className='relative'>
-                                            <Image
-                                                src={url}
-                                                alt={`源图片预览 ${index + 1}`}
-                                                width={112}
-                                                height={112}
-                                                className='aspect-square rounded border border-white/10 object-cover'
-                                                unoptimized
-                                            />
-                                            <Button
-                                                type='button'
-                                                variant='destructive'
-                                                size='icon'
-                                                className='absolute top-0 right-0 h-5 w-5 translate-x-1/3 -translate-y-1/3 transform rounded-full bg-red-600 p-0.5 text-white hover:bg-red-700'
-                                                onClick={() => handleRemoveImage(index)}
-                                                aria-label={`移除图片 ${index + 1}`}>
-                                                <X className='h-3 w-3' />
-                                            </Button>
-                                        </div>
-                                        <Select
-                                            value={imageRoles[index] ?? getDefaultImageRole(index)}
-                                            onValueChange={(value) =>
-                                                handleImageRoleChange(index, value as ReferenceImageRole)
-                                            }
-                                            disabled={isLoading}>
-                                            <SelectTrigger
-                                                aria-label={`图片 ${index + 1} 角色`}
-                                                className='h-8 rounded-md border border-white/20 bg-black px-2 text-xs text-white focus:border-white/50 focus:ring-white/50'>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent className='z-[100] border-white/20 bg-black text-white'>
-                                                {REFERENCE_IMAGE_ROLE_OPTIONS.map((option) => (
-                                                    <SelectItem
-                                                        key={option.value}
-                                                        value={option.value}
-                                                        className='focus:bg-white/10'>
-                                                        {option.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className='space-y-3'>
-                        <Label className='block text-white'>蒙版</Label>
-                        <Button
+                    <div
+                        role='tablist'
+                        aria-label='编辑模式'
+                        className='grid min-h-10 grid-cols-2 overflow-hidden rounded-md border border-white/15 bg-black p-1'>
+                        <button
                             type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={() => setEditShowMaskEditor(!editShowMaskEditor)}
-                            disabled={isLoading || !editOriginalImageSize}
-                            className='w-full justify-start border-white/20 px-3 text-white/80 hover:bg-white/10 hover:text-white'>
-                            {editShowMaskEditor
-                                ? '关闭蒙版编辑器'
-                                : editGeneratedMaskFile
-                                  ? '编辑已保存蒙版'
-                                  : '创建蒙版'}
-                            {editIsMaskSaved && !editShowMaskEditor && (
-                                <span className='ml-auto text-xs text-green-400'>（已保存）</span>
-                            )}
-                            <ScanEye className='mt-0.5' />
-                        </Button>
+                            role='tab'
+                            aria-selected={editMode === 'single'}
+                            onClick={() => setEditMode('single')}
+                            disabled={isLoading}
+                            className={`rounded px-3 text-sm transition-colors ${
+                                editMode === 'single'
+                                    ? 'bg-white text-black'
+                                    : 'text-white/65 hover:bg-white/10 hover:text-white'
+                            } disabled:cursor-not-allowed disabled:opacity-50`}>
+                            单张编辑
+                        </button>
+                        <button
+                            type='button'
+                            role='tab'
+                            aria-selected={editMode === 'batch'}
+                            onClick={() => setEditMode('batch')}
+                            disabled={isLoading}
+                            className={`rounded px-3 text-sm transition-colors ${
+                                editMode === 'batch'
+                                    ? 'bg-white text-black'
+                                    : 'text-white/65 hover:bg-white/10 hover:text-white'
+                            } disabled:cursor-not-allowed disabled:opacity-50`}>
+                            批量编辑
+                        </button>
+                    </div>
 
-                        {editShowMaskEditor && firstImagePreviewUrl && editOriginalImageSize && (
-                            <div className='space-y-3 rounded-md border border-white/20 bg-black p-3'>
-                                <p className='text-xs text-white/60'>
-                                    在下方图片上涂抹需要编辑的区域（涂抹区域会在蒙版中变为透明）。
-                                </p>
-                                <div
-                                    className='relative mx-auto w-full overflow-hidden rounded border border-white/10'
-                                    style={{
-                                        maxWidth: `min(100%, ${editOriginalImageSize.width}px)`,
-                                        aspectRatio: `${editOriginalImageSize.width} / ${editOriginalImageSize.height}`
-                                    }}>
-                                    <Image
-                                        src={firstImagePreviewUrl}
-                                        alt='蒙版编辑图片预览'
-                                        width={editOriginalImageSize.width}
-                                        height={editOriginalImageSize.height}
-                                        className='block h-auto w-full'
-                                        unoptimized
-                                    />
-                                    <canvas
-                                        ref={canvasRef}
-                                        width={editOriginalImageSize.width}
-                                        height={editOriginalImageSize.height}
-                                        className='absolute top-0 left-0 h-full w-full cursor-crosshair'
-                                        onMouseDown={startDrawing}
-                                        onMouseMove={drawLine}
-                                        onMouseUp={stopDrawing}
-                                        onMouseLeave={stopDrawing}
-                                        onTouchStart={startDrawing}
-                                        onTouchMove={drawLine}
-                                        onTouchEnd={stopDrawing}
-                                    />
+                    {editMode === 'batch' ? (
+                        <div className='flex flex-col gap-3 rounded-md border border-white/10 bg-white/[0.03] p-3'>
+                            <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+                                <div className='min-w-0'>
+                                    <Label className='text-white'>批量编辑</Label>
+                                    <p className='mt-1 text-xs leading-5 text-white/50'>
+                                        CSV 中的 input_image_paths 用分号分隔多张图，空参数会使用当前编辑设置。
+                                    </p>
                                 </div>
-                                <div className='grid grid-cols-1 gap-4 pt-2'>
-                                    <div className='space-y-2'>
-                                        <Label htmlFor='brush-size-slider' className='text-sm text-white'>
-                                            画笔大小：{editBrushSize[0]}px
-                                        </Label>
-                                        <Slider
-                                            id='brush-size-slider'
-                                            min={5}
-                                            max={100}
-                                            step={1}
-                                            value={editBrushSize}
-                                            onValueChange={setEditBrushSize}
-                                            disabled={isLoading}
-                                            className='mt-1 [&>button]:border-black [&>button]:bg-white [&>button]:ring-offset-black [&>span:first-child]:h-1 [&>span:first-child>span]:bg-white'
-                                        />
-                                    </div>
-                                </div>
-                                <div className='flex items-center justify-between gap-2 pt-3'>
+                                <div className='flex flex-wrap gap-2'>
                                     <Button
                                         type='button'
-                                        variant='outline'
+                                        variant='ghost'
                                         size='sm'
-                                        onClick={() => maskInputRef.current?.click()}
-                                        disabled={isLoading || !editOriginalImageSize}
-                                        className='mr-auto border-white/20 text-white/80 hover:bg-white/10 hover:text-white'>
-                                        <UploadCloud className='mr-1.5 h-4 w-4' /> 上传蒙版
+                                        onClick={handleDownloadBatchTemplate}
+                                        disabled={isLoading}
+                                        className='h-9 rounded-md px-2 text-white/70 hover:bg-white/10 hover:text-white'>
+                                        <Download className='mr-1.5 h-4 w-4' />
+                                        下载模板
                                     </Button>
-                                    <Input
-                                        ref={maskInputRef}
-                                        id='mask-file-input'
-                                        type='file'
-                                        accept='image/png'
-                                        onChange={handleMaskFileChange}
-                                        className='sr-only'
-                                    />
-                                    <div className='flex gap-2'>
-                                        <Button
-                                            type='button'
-                                            variant='outline'
-                                            size='sm'
-                                            onClick={handleClearMask}
-                                            disabled={isLoading}
-                                            className='border-white/20 text-white/80 hover:bg-white/10 hover:text-white'>
-                                            <Eraser className='mr-1.5 h-4 w-4' /> 清除
-                                        </Button>
-                                        <Button
-                                            type='button'
-                                            variant='default'
-                                            size='sm'
-                                            onClick={generateAndSaveMask}
-                                            disabled={isLoading || editDrawnPoints.length === 0}
-                                            className='bg-white text-black hover:bg-white/90 disabled:opacity-50'>
-                                            <Save className='mr-1.5 h-4 w-4' /> 保存蒙版
-                                        </Button>
-                                    </div>
+                                    <Button
+                                        type='button'
+                                        variant='ghost'
+                                        size='sm'
+                                        onClick={() => batchFileInputRef.current?.click()}
+                                        disabled={isLoading}
+                                        className='h-9 rounded-md px-2 text-white/70 hover:bg-white/10 hover:text-white'>
+                                        <Upload className='mr-1.5 h-4 w-4' />
+                                        导入 CSV
+                                    </Button>
                                 </div>
-                                {editMaskPreviewUrl && (
-                                    <div className='mt-3 border-t border-white/10 pt-3 text-center'>
-                                        <Label className='mb-1.5 block text-sm text-white'>生成的蒙版预览：</Label>
-                                        <div className='inline-block rounded border border-gray-300 bg-white p-1'>
+                            </div>
+
+                            <input
+                                ref={batchFileInputRef}
+                                type='file'
+                                accept='.csv,text/csv'
+                                onChange={handleBatchFileChange}
+                                className='hidden'
+                                aria-label='导入批量编辑 CSV'
+                            />
+
+                            {(batchRows.length > 0 || batchErrors.length > 0 || batchProgress) && (
+                                <div className='flex flex-col gap-2 rounded-md border border-white/10 bg-black p-3 text-sm'>
+                                    {batchRows.length > 0 && (
+                                        <div className='flex flex-col gap-2'>
+                                            <div className='flex flex-wrap items-center justify-between gap-2'>
+                                                <span className='text-white/75'>已解析 {batchRows.length} 个任务</span>
+                                                <Button
+                                                    type='button'
+                                                    size='sm'
+                                                    onClick={handleCreateBatchJobs}
+                                                    disabled={isLoading || batchErrors.length > 0}
+                                                    className='h-9 rounded-md bg-white px-3 text-black hover:bg-white/90 disabled:bg-white/10 disabled:text-white/40'>
+                                                    {isLoading ? (
+                                                        <Loader2 className='mr-1.5 h-4 w-4 animate-spin' />
+                                                    ) : (
+                                                        <ListPlus className='mr-1.5 h-4 w-4' />
+                                                    )}
+                                                    创建批量任务
+                                                </Button>
+                                            </div>
+                                            <div className='max-h-24 overflow-y-auto rounded border border-white/10'>
+                                                {batchRows.slice(0, 5).map((row) => (
+                                                    <div
+                                                        key={row.line}
+                                                        className='border-b border-white/10 px-2 py-1.5 text-xs text-white/55 last:border-b-0'>
+                                                        第 {row.line} 行 · {row.model} · {row.size} ·{' '}
+                                                        {row.inputImagePaths.length} 张图 ·{' '}
+                                                        <span className='text-white/75'>{row.prompt}</span>
+                                                    </div>
+                                                ))}
+                                                {batchRows.length > 5 && (
+                                                    <div className='px-2 py-1.5 text-xs text-white/45'>
+                                                        还有 {batchRows.length - 5} 个任务会按 CSV 顺序创建。
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {batchProgress && <p className='text-xs text-sky-200'>{batchProgress}</p>}
+                                    {batchErrors.length > 0 && (
+                                        <div className='flex flex-col gap-1 text-xs text-red-300'>
+                                            {batchErrors.slice(0, 8).map((error) => (
+                                                <p key={error}>{error}</p>
+                                            ))}
+                                            {batchErrors.length > 8 && <p>还有 {batchErrors.length - 8} 个错误。</p>}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            <div className='flex flex-col gap-1.5'>
+                                <Label htmlFor='edit-model-select' className='text-white'>
+                                    模型
+                                </Label>
+                                <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4'>
+                                    <Select
+                                        value={editModel}
+                                        onValueChange={(value) => setEditModel(value as EditingFormData['model'])}
+                                        disabled={isLoading}>
+                                        <SelectTrigger
+                                            id='edit-model-select'
+                                            className='w-full rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50 sm:w-[180px]'>
+                                            <SelectValue placeholder='选择模型' />
+                                        </SelectTrigger>
+                                        <SelectContent className='z-[100] border-white/20 bg-black text-white'>
+                                            {(modelOptions && modelOptions.length > 0 ? modelOptions : IMAGE_MODEL_OPTIONS).map((option) => (
+                                                /* IMAGE_MODEL_OPTIONS.map fallback */
+                                                <SelectItem
+                                                    key={option.value}
+                                                    value={option.value}
+                                                    className='focus:bg-white/10'>
+                                                    {option.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {isGptImage2 && (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Info className='h-4 w-4 cursor-help text-white/40 hover:text-white/60' />
+                                            </TooltipTrigger>
+                                            <TooltipContent className='max-w-[280px]'>
+                                                gpt-image-2 始终以高保真度处理参考图，可提升编辑质量，但每次请求会比
+                                                gpt-image-1.5 默认保真度消耗更多图片输入 token。
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    )}
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div className='flex items-center gap-2'>
+                                                <Checkbox
+                                                    id='edit-enable-streaming'
+                                                    checked={enableStreaming}
+                                                    onCheckedChange={(checked) => setEnableStreaming(!!checked)}
+                                                    disabled={isLoading || editN[0] > 1}
+                                                    className='border-white/40 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-black'
+                                                />
+                                                <Label
+                                                    htmlFor='edit-enable-streaming'
+                                                    className={`text-sm ${editN[0] > 1 ? 'cursor-not-allowed text-white/40' : 'cursor-pointer text-white/80'}`}>
+                                                    启用流式预览
+                                                </Label>
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent className='max-w-[250px]'>
+                                            {editN[0] > 1
+                                                ? '流式预览仅支持一次生成 1 张图片（n=1）。'
+                                                : '生成过程中显示阶段性预览图，交互反馈更及时。'}
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </div>
+                            </div>
+
+                            {enableStreaming && (
+                                <div className='space-y-3'>
+                                    <div className='flex items-center gap-2'>
+                                        <Label className='text-white'>预览图片数</Label>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <HelpCircle className='h-4 w-4 cursor-help text-white/40 hover:text-white/60' />
+                                            </TooltipTrigger>
+                                            <TooltipContent className='max-w-[250px]'>
+                                                每张预览图约增加 $0.003 成本（额外 100 个输出 token）。
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                    <RadioGroup
+                                        value={String(partialImages)}
+                                        onValueChange={(value) => setPartialImages(Number(value) as 1 | 2 | 3)}
+                                        disabled={isLoading}
+                                        className='flex gap-x-5'>
+                                        <div className='flex items-center space-x-2'>
+                                            <RadioGroupItem
+                                                value='1'
+                                                id='edit-partial-1'
+                                                className='border-white/40 text-white data-[state=checked]:border-white data-[state=checked]:text-white'
+                                            />
+                                            <Label htmlFor='edit-partial-1' className='cursor-pointer text-white/80'>
+                                                1
+                                            </Label>
+                                        </div>
+                                        <div className='flex items-center space-x-2'>
+                                            <RadioGroupItem
+                                                value='2'
+                                                id='edit-partial-2'
+                                                className='border-white/40 text-white data-[state=checked]:border-white data-[state=checked]:text-white'
+                                            />
+                                            <Label htmlFor='edit-partial-2' className='cursor-pointer text-white/80'>
+                                                2
+                                            </Label>
+                                        </div>
+                                        <div className='flex items-center space-x-2'>
+                                            <RadioGroupItem
+                                                value='3'
+                                                id='edit-partial-3'
+                                                className='border-white/40 text-white data-[state=checked]:border-white data-[state=checked]:text-white'
+                                            />
+                                            <Label htmlFor='edit-partial-3' className='cursor-pointer text-white/80'>
+                                                3
+                                            </Label>
+                                        </div>
+                                    </RadioGroup>
+                                </div>
+                            )}
+
+                            <div className='space-y-1.5'>
+                                <Label htmlFor='edit-prompt' className='text-white'>
+                                    提示词
+                                </Label>
+                                <Textarea
+                                    id='edit-prompt'
+                                    placeholder='例如：给主体添加一顶派对帽'
+                                    value={editPrompt}
+                                    onChange={(e) => setEditPrompt(e.target.value)}
+                                    required
+                                    disabled={isLoading}
+                                    className='min-h-[80px] rounded-md border border-white/20 bg-black text-white placeholder:text-white/40 focus:border-white/50 focus:ring-white/50'
+                                />
+                            </div>
+
+                            <div className='space-y-2'>
+                                <Label className='text-white'>源图片（最多 10 张）</Label>
+                                <Label
+                                    htmlFor='image-files-input'
+                                    className='flex h-10 w-full cursor-pointer items-center justify-between rounded-md border border-white/20 bg-black px-3 py-2 text-sm transition-colors hover:bg-white/5'>
+                                    <span className='truncate pr-2 text-white/60'>{displayFileNames(imageFiles)}</span>
+                                    <span className='flex shrink-0 items-center gap-1.5 rounded-md bg-white/10 px-3 py-1 text-xs font-medium text-white/80 hover:bg-white/20'>
+                                        <Upload className='h-3 w-3' /> 浏览...
+                                    </span>
+                                </Label>
+                                <Input
+                                    id='image-files-input'
+                                    type='file'
+                                    accept='image/png, image/jpeg, image/webp'
+                                    multiple
+                                    onChange={handleImageFileChange}
+                                    disabled={isLoading || imageFiles.length >= maxImages}
+                                    className='sr-only'
+                                />
+                                {sourceImagePreviewUrls.length > 0 && (
+                                    <div className='flex space-x-2 overflow-x-auto pt-2'>
+                                        {sourceImagePreviewUrls.map((url, index) => (
+                                            <div key={url} className='w-28 shrink-0 space-y-2'>
+                                                <div className='relative'>
+                                                    <Image
+                                                        src={url}
+                                                        alt={`源图片预览 ${index + 1}`}
+                                                        width={112}
+                                                        height={112}
+                                                        className='aspect-square rounded border border-white/10 object-cover'
+                                                        unoptimized
+                                                    />
+                                                    <Button
+                                                        type='button'
+                                                        variant='destructive'
+                                                        size='icon'
+                                                        className='absolute top-0 right-0 h-5 w-5 translate-x-1/3 -translate-y-1/3 transform rounded-full bg-red-600 p-0.5 text-white hover:bg-red-700'
+                                                        onClick={() => handleRemoveImage(index)}
+                                                        aria-label={`移除图片 ${index + 1}`}>
+                                                        <X className='h-3 w-3' />
+                                                    </Button>
+                                                </div>
+                                                <Select
+                                                    value={imageRoles[index] ?? getDefaultImageRole(index)}
+                                                    onValueChange={(value) =>
+                                                        handleImageRoleChange(index, value as ReferenceImageRole)
+                                                    }
+                                                    disabled={isLoading}>
+                                                    <SelectTrigger
+                                                        aria-label={`图片 ${index + 1} 角色`}
+                                                        className='h-8 rounded-md border border-white/20 bg-black px-2 text-xs text-white focus:border-white/50 focus:ring-white/50'>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent className='z-[100] border-white/20 bg-black text-white'>
+                                                        {REFERENCE_IMAGE_ROLE_OPTIONS.map((option) => (
+                                                            <SelectItem
+                                                                key={option.value}
+                                                                value={option.value}
+                                                                className='focus:bg-white/10'>
+                                                                {option.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className='space-y-3'>
+                                <Label className='block text-white'>蒙版</Label>
+                                <Button
+                                    type='button'
+                                    variant='outline'
+                                    size='sm'
+                                    onClick={() => setEditShowMaskEditor(!editShowMaskEditor)}
+                                    disabled={isLoading || !editOriginalImageSize}
+                                    className='w-full justify-start border-white/20 px-3 text-white/80 hover:bg-white/10 hover:text-white'>
+                                    {editShowMaskEditor
+                                        ? '关闭蒙版编辑器'
+                                        : editGeneratedMaskFile
+                                          ? '编辑已保存蒙版'
+                                          : '创建蒙版'}
+                                    {editIsMaskSaved && !editShowMaskEditor && (
+                                        <span className='ml-auto text-xs text-green-400'>（已保存）</span>
+                                    )}
+                                    <ScanEye className='mt-0.5' />
+                                </Button>
+
+                                {editShowMaskEditor && firstImagePreviewUrl && editOriginalImageSize && (
+                                    <div className='space-y-3 rounded-md border border-white/20 bg-black p-3'>
+                                        <p className='text-xs text-white/60'>
+                                            在下方图片上涂抹需要编辑的区域（涂抹区域会在蒙版中变为透明）。
+                                        </p>
+                                        <div
+                                            className='relative mx-auto w-full overflow-hidden rounded border border-white/10'
+                                            style={{
+                                                maxWidth: `min(100%, ${editOriginalImageSize.width}px)`,
+                                                aspectRatio: `${editOriginalImageSize.width} / ${editOriginalImageSize.height}`
+                                            }}>
                                             <Image
-                                                src={editMaskPreviewUrl}
-                                                alt='生成的蒙版预览'
-                                                width={0}
-                                                height={134}
-                                                className='block max-w-full'
-                                                style={{ width: 'auto', height: '134px' }}
+                                                src={firstImagePreviewUrl}
+                                                alt='蒙版编辑图片预览'
+                                                width={editOriginalImageSize.width}
+                                                height={editOriginalImageSize.height}
+                                                className='block h-auto w-full'
                                                 unoptimized
                                             />
+                                            <canvas
+                                                ref={canvasRef}
+                                                width={editOriginalImageSize.width}
+                                                height={editOriginalImageSize.height}
+                                                className='absolute top-0 left-0 h-full w-full cursor-crosshair'
+                                                onMouseDown={startDrawing}
+                                                onMouseMove={drawLine}
+                                                onMouseUp={stopDrawing}
+                                                onMouseLeave={stopDrawing}
+                                                onTouchStart={startDrawing}
+                                                onTouchMove={drawLine}
+                                                onTouchEnd={stopDrawing}
+                                            />
                                         </div>
+                                        <div className='grid grid-cols-1 gap-4 pt-2'>
+                                            <div className='space-y-2'>
+                                                <Label htmlFor='brush-size-slider' className='text-sm text-white'>
+                                                    画笔大小：{editBrushSize[0]}px
+                                                </Label>
+                                                <Slider
+                                                    id='brush-size-slider'
+                                                    min={5}
+                                                    max={100}
+                                                    step={1}
+                                                    value={editBrushSize}
+                                                    onValueChange={setEditBrushSize}
+                                                    disabled={isLoading}
+                                                    className='mt-1 [&>button]:border-black [&>button]:bg-white [&>button]:ring-offset-black [&>span:first-child]:h-1 [&>span:first-child>span]:bg-white'
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className='flex items-center justify-between gap-2 pt-3'>
+                                            <Button
+                                                type='button'
+                                                variant='outline'
+                                                size='sm'
+                                                onClick={() => maskInputRef.current?.click()}
+                                                disabled={isLoading || !editOriginalImageSize}
+                                                className='mr-auto border-white/20 text-white/80 hover:bg-white/10 hover:text-white'>
+                                                <UploadCloud className='mr-1.5 h-4 w-4' /> 上传蒙版
+                                            </Button>
+                                            <Input
+                                                ref={maskInputRef}
+                                                id='mask-file-input'
+                                                type='file'
+                                                accept='image/png'
+                                                onChange={handleMaskFileChange}
+                                                className='sr-only'
+                                            />
+                                            <div className='flex gap-2'>
+                                                <Button
+                                                    type='button'
+                                                    variant='outline'
+                                                    size='sm'
+                                                    onClick={handleClearMask}
+                                                    disabled={isLoading}
+                                                    className='border-white/20 text-white/80 hover:bg-white/10 hover:text-white'>
+                                                    <Eraser className='mr-1.5 h-4 w-4' /> 清除
+                                                </Button>
+                                                <Button
+                                                    type='button'
+                                                    variant='default'
+                                                    size='sm'
+                                                    onClick={generateAndSaveMask}
+                                                    disabled={isLoading || editDrawnPoints.length === 0}
+                                                    className='bg-white text-black hover:bg-white/90 disabled:opacity-50'>
+                                                    <Save className='mr-1.5 h-4 w-4' /> 保存蒙版
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        {editMaskPreviewUrl && (
+                                            <div className='mt-3 border-t border-white/10 pt-3 text-center'>
+                                                <Label className='mb-1.5 block text-sm text-white'>
+                                                    生成的蒙版预览：
+                                                </Label>
+                                                <div className='inline-block rounded border border-gray-300 bg-white p-1'>
+                                                    <Image
+                                                        src={editMaskPreviewUrl}
+                                                        alt='生成的蒙版预览'
+                                                        width={0}
+                                                        height={134}
+                                                        className='block max-w-full'
+                                                        style={{ width: 'auto', height: '134px' }}
+                                                        unoptimized
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                        {editIsMaskSaved && !editMaskPreviewUrl && (
+                                            <p className='pt-1 text-center text-xs text-yellow-400'>
+                                                正在生成蒙版预览...
+                                            </p>
+                                        )}
+                                        {editIsMaskSaved && editMaskPreviewUrl && (
+                                            <p className='pt-1 text-center text-xs text-green-400'>蒙版已保存。</p>
+                                        )}
                                     </div>
                                 )}
-                                {editIsMaskSaved && !editMaskPreviewUrl && (
-                                    <p className='pt-1 text-center text-xs text-yellow-400'>正在生成蒙版预览...</p>
-                                )}
-                                {editIsMaskSaved && editMaskPreviewUrl && (
-                                    <p className='pt-1 text-center text-xs text-green-400'>蒙版已保存。</p>
+                                {!editShowMaskEditor && editGeneratedMaskFile && (
+                                    <p className='pt-1 text-xs text-green-400'>
+                                        已应用蒙版：{editGeneratedMaskFile.name}
+                                    </p>
                                 )}
                             </div>
-                        )}
-                        {!editShowMaskEditor && editGeneratedMaskFile && (
-                            <p className='pt-1 text-xs text-green-400'>已应用蒙版：{editGeneratedMaskFile.name}</p>
-                        )}
-                    </div>
 
-                    <div className='space-y-3'>
-                        <Label className='block text-white'>尺寸</Label>
-                        <RadioGroup
-                            value={editSize}
-                            onValueChange={(value) => setEditSize(value as EditingFormData['size'])}
-                            disabled={isLoading}
-                            className='flex flex-wrap gap-x-5 gap-y-3'>
-                            <RadioItemWithIcon value='auto' id='edit-size-auto' label='自动' Icon={Sparkles} />
-                            {isGptImage2 && (
-                                <RadioItemWithIcon
-                                    value='custom'
-                                    id='edit-size-custom'
-                                    label='自定义'
-                                    Icon={SquareDashed}
+                            <div className='space-y-3'>
+                                <Label className='block text-white'>尺寸</Label>
+                                <RadioGroup
+                                    value={editSize}
+                                    onValueChange={(value) => setEditSize(value as EditingFormData['size'])}
+                                    disabled={isLoading}
+                                    className='flex flex-wrap gap-x-5 gap-y-3'>
+                                    <RadioItemWithIcon value='auto' id='edit-size-auto' label='自动' Icon={Sparkles} />
+                                    {isGptImage2 && (
+                                        <RadioItemWithIcon
+                                            value='custom'
+                                            id='edit-size-custom'
+                                            label='自定义'
+                                            Icon={SquareDashed}
+                                        />
+                                    )}
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div>
+                                                <RadioItemWithIcon
+                                                    value='square'
+                                                    id='edit-size-square'
+                                                    label='方形'
+                                                    Icon={Square}
+                                                />
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{getPresetTooltip('square', editModel)}</TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div>
+                                                <RadioItemWithIcon
+                                                    value='landscape'
+                                                    id='edit-size-landscape'
+                                                    label='横向'
+                                                    Icon={RectangleHorizontal}
+                                                />
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{getPresetTooltip('landscape', editModel)}</TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div>
+                                                <RadioItemWithIcon
+                                                    value='portrait'
+                                                    id='edit-size-portrait'
+                                                    label='纵向'
+                                                    Icon={RectangleVertical}
+                                                />
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{getPresetTooltip('portrait', editModel)}</TooltipContent>
+                                    </Tooltip>
+                                </RadioGroup>
+                                {isGptImage2 && editSize === 'custom' && (
+                                    <div className='space-y-2 rounded-md border border-white/10 bg-white/5 p-3'>
+                                        <div className='flex items-center gap-3'>
+                                            <div className='flex-1 space-y-1'>
+                                                <Label htmlFor='edit-custom-width' className='text-xs text-white/70'>
+                                                    宽度（px）
+                                                </Label>
+                                                <Input
+                                                    id='edit-custom-width'
+                                                    type='number'
+                                                    min={16}
+                                                    max={3840}
+                                                    step={16}
+                                                    value={editCustomWidth}
+                                                    onChange={(e) =>
+                                                        setEditCustomWidth(parseInt(e.target.value, 10) || 0)
+                                                    }
+                                                    disabled={isLoading}
+                                                    className='rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50'
+                                                />
+                                            </div>
+                                            <span className='pt-5 text-white/60'>×</span>
+                                            <div className='flex-1 space-y-1'>
+                                                <Label htmlFor='edit-custom-height' className='text-xs text-white/70'>
+                                                    高度（px）
+                                                </Label>
+                                                <Input
+                                                    id='edit-custom-height'
+                                                    type='number'
+                                                    min={16}
+                                                    max={3840}
+                                                    step={16}
+                                                    value={editCustomHeight}
+                                                    onChange={(e) =>
+                                                        setEditCustomHeight(parseInt(e.target.value, 10) || 0)
+                                                    }
+                                                    disabled={isLoading}
+                                                    className='rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50'
+                                                />
+                                            </div>
+                                        </div>
+                                        <p className='text-xs text-white/50'>
+                                            {(editCustomWidth * editCustomHeight).toLocaleString()} 像素（最大值的{' '}
+                                            {(((editCustomWidth * editCustomHeight) / 8_294_400) * 100).toFixed(1)}%） ·{' '}
+                                            {editCustomWidth > 0 && editCustomHeight > 0
+                                                ? `${(Math.max(editCustomWidth, editCustomHeight) / Math.min(editCustomWidth, editCustomHeight)).toFixed(2)}:1 比例`
+                                                : '—'}
+                                        </p>
+                                        {!customSizeValidation.valid && (
+                                            <p className='text-xs text-red-400'>{customSizeValidation.reason}</p>
+                                        )}
+                                        <p className='text-xs text-white/40'>
+                                            约束：宽高需为 16 的倍数，单边最大 3840px，宽高比不超过 3:1，总像素需在
+                                            655,360 到 8,294,400 之间。
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className='space-y-3'>
+                                <Label className='block text-white'>质量</Label>
+                                <RadioGroup
+                                    value={editQuality}
+                                    onValueChange={(value) => setEditQuality(value as EditingFormData['quality'])}
+                                    disabled={isLoading}
+                                    className='flex flex-wrap gap-x-5 gap-y-3'>
+                                    <RadioItemWithIcon
+                                        value='auto'
+                                        id='edit-quality-auto'
+                                        label='自动'
+                                        Icon={Sparkles}
+                                    />
+                                    <RadioItemWithIcon value='low' id='edit-quality-low' label='低' Icon={Tally1} />
+                                    <RadioItemWithIcon
+                                        value='medium'
+                                        id='edit-quality-medium'
+                                        label='中'
+                                        Icon={Tally2}
+                                    />
+                                    <RadioItemWithIcon value='high' id='edit-quality-high' label='高' Icon={Tally3} />
+                                </RadioGroup>
+                            </div>
+
+                            <div className='space-y-2'>
+                                <Label htmlFor='edit-n-slider' className='text-white'>
+                                    图片数量：{editN[0]}
+                                </Label>
+                                <Slider
+                                    id='edit-n-slider'
+                                    min={1}
+                                    max={10}
+                                    step={1}
+                                    value={editN}
+                                    onValueChange={setEditN}
+                                    disabled={isLoading}
+                                    className='mt-3 [&>button]:border-black [&>button]:bg-white [&>button]:ring-offset-black [&>span:first-child]:h-1 [&>span:first-child>span]:bg-white'
                                 />
-                            )}
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div>
-                                        <RadioItemWithIcon
-                                            value='square'
-                                            id='edit-size-square'
-                                            label='方形'
-                                            Icon={Square}
-                                        />
-                                    </div>
-                                </TooltipTrigger>
-                                <TooltipContent>{getPresetTooltip('square', editModel)}</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div>
-                                        <RadioItemWithIcon
-                                            value='landscape'
-                                            id='edit-size-landscape'
-                                            label='横向'
-                                            Icon={RectangleHorizontal}
-                                        />
-                                    </div>
-                                </TooltipTrigger>
-                                <TooltipContent>{getPresetTooltip('landscape', editModel)}</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div>
-                                        <RadioItemWithIcon
-                                            value='portrait'
-                                            id='edit-size-portrait'
-                                            label='纵向'
-                                            Icon={RectangleVertical}
-                                        />
-                                    </div>
-                                </TooltipTrigger>
-                                <TooltipContent>{getPresetTooltip('portrait', editModel)}</TooltipContent>
-                            </Tooltip>
-                        </RadioGroup>
-                        {isGptImage2 && editSize === 'custom' && (
-                            <div className='space-y-2 rounded-md border border-white/10 bg-white/5 p-3'>
-                                <div className='flex items-center gap-3'>
-                                    <div className='flex-1 space-y-1'>
-                                        <Label htmlFor='edit-custom-width' className='text-xs text-white/70'>
-                                            宽度（px）
-                                        </Label>
-                                        <Input
-                                            id='edit-custom-width'
-                                            type='number'
-                                            min={16}
-                                            max={3840}
-                                            step={16}
-                                            value={editCustomWidth}
-                                            onChange={(e) => setEditCustomWidth(parseInt(e.target.value, 10) || 0)}
-                                            disabled={isLoading}
-                                            className='rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50'
-                                        />
-                                    </div>
-                                    <span className='pt-5 text-white/60'>×</span>
-                                    <div className='flex-1 space-y-1'>
-                                        <Label htmlFor='edit-custom-height' className='text-xs text-white/70'>
-                                            高度（px）
-                                        </Label>
-                                        <Input
-                                            id='edit-custom-height'
-                                            type='number'
-                                            min={16}
-                                            max={3840}
-                                            step={16}
-                                            value={editCustomHeight}
-                                            onChange={(e) => setEditCustomHeight(parseInt(e.target.value, 10) || 0)}
-                                            disabled={isLoading}
-                                            className='rounded-md border border-white/20 bg-black text-white focus:border-white/50 focus:ring-white/50'
-                                        />
-                                    </div>
-                                </div>
-                                <p className='text-xs text-white/50'>
-                                    {(editCustomWidth * editCustomHeight).toLocaleString()} 像素（最大值的{' '}
-                                    {(((editCustomWidth * editCustomHeight) / 8_294_400) * 100).toFixed(1)}%） ·{' '}
-                                    {editCustomWidth > 0 && editCustomHeight > 0
-                                        ? `${(Math.max(editCustomWidth, editCustomHeight) / Math.min(editCustomWidth, editCustomHeight)).toFixed(2)}:1 比例`
-                                        : '—'}
-                                </p>
-                                {!customSizeValidation.valid && (
-                                    <p className='text-xs text-red-400'>{customSizeValidation.reason}</p>
-                                )}
-                                <p className='text-xs text-white/40'>
-                                    约束：宽高需为 16 的倍数，单边最大 3840px，宽高比不超过 3:1，总像素需在 655,360 到
-                                    8,294,400 之间。
-                                </p>
                             </div>
-                        )}
-                    </div>
-
-                    <div className='space-y-3'>
-                        <Label className='block text-white'>质量</Label>
-                        <RadioGroup
-                            value={editQuality}
-                            onValueChange={(value) => setEditQuality(value as EditingFormData['quality'])}
-                            disabled={isLoading}
-                            className='flex flex-wrap gap-x-5 gap-y-3'>
-                            <RadioItemWithIcon value='auto' id='edit-quality-auto' label='自动' Icon={Sparkles} />
-                            <RadioItemWithIcon value='low' id='edit-quality-low' label='低' Icon={Tally1} />
-                            <RadioItemWithIcon value='medium' id='edit-quality-medium' label='中' Icon={Tally2} />
-                            <RadioItemWithIcon value='high' id='edit-quality-high' label='高' Icon={Tally3} />
-                        </RadioGroup>
-                    </div>
-
-                    <div className='space-y-2'>
-                        <Label htmlFor='edit-n-slider' className='text-white'>
-                            图片数量：{editN[0]}
-                        </Label>
-                        <Slider
-                            id='edit-n-slider'
-                            min={1}
-                            max={10}
-                            step={1}
-                            value={editN}
-                            onValueChange={setEditN}
-                            disabled={isLoading}
-                            className='mt-3 [&>button]:border-black [&>button]:bg-white [&>button]:ring-offset-black [&>span:first-child]:h-1 [&>span:first-child>span]:bg-white'
-                        />
-                    </div>
+                        </>
+                    )}
                 </CardContent>
-                <CardFooter className='border-t border-white/10 p-4'>
-                    <Button
-                        type='submit'
-                        disabled={isLoading || !editPrompt || imageFiles.length === 0 || customSizeInvalid}
-                        className='flex w-full items-center justify-center gap-2 rounded-md bg-white text-black hover:bg-white/90 disabled:bg-white/10 disabled:text-white/40'>
-                        {isLoading && <Loader2 className='h-4 w-4 animate-spin' />}
-                        {isLoading ? '编辑中...' : '编辑图片'}
-                    </Button>
-                </CardFooter>
+                {editMode === 'single' && (
+                    <CardFooter className='border-t border-white/10 p-4'>
+                        <Button
+                            type='submit'
+                            disabled={isLoading || !editPrompt || imageFiles.length === 0 || customSizeInvalid}
+                            className='flex w-full items-center justify-center gap-2 rounded-md bg-white text-black hover:bg-white/90 disabled:bg-white/10 disabled:text-white/40'>
+                            {isLoading && <Loader2 className='h-4 w-4 animate-spin' />}
+                            {isLoading ? '编辑中...' : '编辑图片'}
+                        </Button>
+                    </CardFooter>
+                )}
             </form>
         </Card>
     );

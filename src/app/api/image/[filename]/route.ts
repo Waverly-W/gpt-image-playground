@@ -55,7 +55,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                       contentType: lookup(filename) || 'application/octet-stream'
                   };
 
-        return new NextResponse(image.buffer, {
+        return new NextResponse(new Uint8Array(image.buffer), {
             status: 200,
             headers: {
                 'Content-Type': image.contentType,

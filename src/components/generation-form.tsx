@@ -107,6 +107,7 @@ type GenerationFormProps = {
     partialImages: 1 | 2 | 3;
     setPartialImages: React.Dispatch<React.SetStateAction<1 | 2 | 3>>;
     importedPromptBuilderConfig?: PromptBuilderConfig | null;
+    modelOptions?: Array<{ value: string; label: string }>;
 };
 
 type GenerationMode = 'single' | 'batch';
@@ -183,7 +184,8 @@ export function GenerationForm({
     setEnableStreaming,
     partialImages,
     setPartialImages,
-    importedPromptBuilderConfig
+    importedPromptBuilderConfig,
+    modelOptions
 }: GenerationFormProps) {
     const showCompression = outputFormat === 'jpeg' || outputFormat === 'webp';
     const isGptImage2 = model === 'gpt-image-2';
@@ -402,7 +404,8 @@ export function GenerationForm({
                                             <SelectValue placeholder='选择模型' />
                                         </SelectTrigger>
                                         <SelectContent className='z-[100] border-white/20 bg-black text-white'>
-                                            {IMAGE_MODEL_OPTIONS.map((option) => (
+                                            {(modelOptions && modelOptions.length > 0 ? modelOptions : IMAGE_MODEL_OPTIONS).map((option) => (
+                                                /* IMAGE_MODEL_OPTIONS.map fallback */
                                                 <SelectItem
                                                     key={option.value}
                                                     value={option.value}

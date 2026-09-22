@@ -63,6 +63,17 @@ function migrate(database: Database.Database) {
 
         CREATE INDEX IF NOT EXISTS idx_image_jobs_owner_updated
             ON image_jobs (owner_user_id, updated_at DESC);
+
+        CREATE TABLE IF NOT EXISTS models (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            is_default INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
     `);
 
     const imageJobColumns = database.prepare('PRAGMA table_info(image_jobs)').all() as Array<{ name: string }>;

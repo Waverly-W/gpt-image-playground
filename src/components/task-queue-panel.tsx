@@ -30,6 +30,7 @@ import {
     Layers,
     Loader2,
     MessageSquareWarning,
+    RotateCcw,
     Trash2,
     XCircle
 } from 'lucide-react';
@@ -37,6 +38,7 @@ import * as React from 'react';
 
 export type QueueImageJob = {
     id: string;
+    ownerUserId?: string;
     status: 'pending' | 'running' | 'completed' | 'failed';
     mode: 'generate' | 'edit';
     prompt: string;
@@ -63,10 +65,14 @@ type TaskQueuePanelProps = {
     jobs: QueueImageJob[];
     onClearQueue: () => void;
     onCancelPendingJob: (jobId: string) => void;
+    onRetryFailedJob: (jobId: string) => void;
     onUpdateQualityFeedback: (
         jobId: string,
         feedback: { failureReasons: ImageQualityFailureReason[]; note: string }
     ) => Promise<void>;
+    isAdmin?: boolean;
+    scope?: 'all' | 'mine';
+    onScopeChange?: (scope: 'all' | 'mine') => void;
 };
 
 const QUALITY_FAILURE_REASON_OPTIONS = IMAGE_QUALITY_FAILURE_REASON_OPTIONS;
@@ -383,13 +389,43 @@ export function TaskQueuePanel({
     jobs,
     onClearQueue,
     onCancelPendingJob,
-    onUpdateQualityFeedback
+    onRetryFailedJob,
+    onUpdateQualityFeedback,
+    isAdmin = false,
+    scope = 'all',
+    onScopeChange
 }: TaskQueuePanelProps) {
     return (
         <Card className='flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-neutral-950'>
             <CardHeader className='flex flex-row items-center justify-between gap-3 border-b border-white/10 px-4 py-4'>
                 <div className='min-w-0'>
-                    <CardTitle className='text-xl font-semibold text-white'>任务队列</CardTitle>
+                    <div className='flex items-center gap-3'>
+                        <CardTitle className='text-xl font-semibold text-white'>任务队列</CardTitle>
+                        {isAdmin && (
+                            <div className='inline-flex rounded-lg border border-white/10 bg-black/40 p-0.5 text-xs'>
+                                <button
+                                    type='button'
+                                    onClick={() => onScopeChange?.('all')}
+                                    className={`rounded-md px-2.5 py-1 transition-colors ${
+                                        scope === 'all'
+                                            ? 'bg-white/15 font-medium text-white shadow-sm'
+                                            : 'text-white/50 hover:text-white/80'
+                                    }`}>
+                                    全部任务 ({jobs.length})
+                                </button>
+                                <button
+                                    type='button'
+                                    onClick={() => onScopeChange?.('mine')}
+                                    className={`rounded-md px-2.5 py-1 transition-colors ${
+                                        scope === 'mine'
+                                            ? 'bg-white/15 font-medium text-white shadow-sm'
+                                            : 'text-white/50 hover:text-white/80'
+                                    }`}>
+                                    仅我的
+                                </button>
+                            </div>
+                        )}
+                    </div>
                     <p className='mt-1 text-sm text-white/50'>最多 5 个任务同时生成，最新任务显示在顶部。</p>
                 </div>
                 {jobs.length > 0 && (
@@ -439,6 +475,13 @@ export function TaskQueuePanel({
                                                             R2
                                                         </span>
                                                     )}
+                                                    {isAdmin && job.ownerUserId && (
+                                                        <span
+                                                            title={`所有者: ${job.ownerUserId}`}
+                                                            className='max-w-[140px] truncate rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-white/50'>
+                                                            {job.ownerUserId}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div className='flex shrink-0 items-center gap-1'>
                                                     {promptInspectorData && (
@@ -449,6 +492,18 @@ export function TaskQueuePanel({
                                                             job={job}
                                                             onUpdateQualityFeedback={onUpdateQualityFeedback}
                                                         />
+                                                    )}
+                                                    {job.status === 'failed' && (
+                                                        <Button
+                                                            type='button'
+                                                            variant='ghost'
+                                                            size='icon'
+                                                            aria-label='重试失败任务'
+                                                            title='重试失败任务'
+                                                            onClick={() => onRetryFailedJob(job.id)}
+                                                            className='h-8 w-8 rounded-md text-white/35 hover:bg-white/10 hover:text-white/70'>
+                                                            <RotateCcw className='h-4 w-4' />
+                                                        </Button>
                                                     )}
                                                 </div>
                                             </div>

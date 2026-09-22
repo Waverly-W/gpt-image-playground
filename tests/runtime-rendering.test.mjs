@@ -42,7 +42,10 @@ test('generation form uses the shared prompt inspector for guided prompts', () =
 test('task queue shows saved prompt inspector metadata for completed jobs', () => {
     const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
 
-    assert.match(taskQueuePanel, /import \{ PromptInspector, type PromptInspectorBlock \} from '@\/components\/prompt-inspector'/);
+    assert.match(
+        taskQueuePanel,
+        /import \{ PromptInspector, type PromptInspectorBlock \} from '@\/components\/prompt-inspector'/
+    );
     assert.match(taskQueuePanel, /PromptInspectorDialog/);
     assert.match(taskQueuePanel, /getJobPromptInspectorData/);
     assert.match(taskQueuePanel, /job\.params\.full_prompt/);
@@ -60,7 +63,10 @@ test('task queue shows saved prompt inspector metadata for completed jobs', () =
 test('task queue keeps thumbnails square when task dialogs open', () => {
     const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
 
-    assert.match(taskQueuePanel, /className='flex flex-col gap-3 rounded-md border border-white\/10 bg-neutral-950\/70 p-3'/);
+    assert.match(
+        taskQueuePanel,
+        /className='flex flex-col gap-3 rounded-md border border-white\/10 bg-neutral-950\/70 p-3'/
+    );
     assert.match(taskQueuePanel, /className='flex items-start gap-3'/);
     assert.match(taskQueuePanel, /relative h-24 w-24 shrink-0 self-start overflow-hidden rounded-md/);
     assert.doesNotMatch(taskQueuePanel, /<div className='sm:pl-\[6\.75rem\]'>\s*<PromptInspector/);
@@ -86,7 +92,10 @@ test('task queue exposes quality feedback controls for completed jobs', () => {
     assert.match(qualityFeedback, /信息密度不对/);
     assert.match(taskQueuePanel, /onUpdateQualityFeedback/);
     assert.match(taskQueuePanel, /job\.status === 'completed'/);
-    assert.doesNotMatch(taskQueuePanel, /job\.status === 'completed' && \(\s*<div className='sm:pl-\[6\.75rem\]'>\s*<QualityFeedbackPanel/);
+    assert.doesNotMatch(
+        taskQueuePanel,
+        /job\.status === 'completed' && \(\s*<div className='sm:pl-\[6\.75rem\]'>\s*<QualityFeedbackPanel/
+    );
     assert.match(playgroundClient, /handleUpdateQualityFeedback/);
     assert.match(playgroundClient, /method: 'PATCH'/);
     assert.match(jobRoute, /updateImageJobQualityFeedbackForUser/);
@@ -175,6 +184,41 @@ test('edit mode submits semantic reference image roles', () => {
     assert.match(playgroundClient, /apiFormData\.append\(`image_role_\$\{index\}`, role\)/);
 });
 
+test('edit mode supports CSV batch editing through the existing job queue', () => {
+    const editingForm = fs.readFileSync(new URL('../src/components/editing-form.tsx', import.meta.url), 'utf8');
+
+    assert.match(editingForm, /createBatchEditCsvTemplate/);
+    assert.match(editingForm, /parseBatchEditCsv/);
+    assert.match(editingForm, /批量编辑/);
+    assert.match(editingForm, /input_image_paths/);
+    assert.match(playgroundClient, /createBatchEditJobFormData/);
+    assert.match(playgroundClient, /handleBatchEditApiCall/);
+});
+
+test('internal batch APIs create local queued jobs from absolute CSV paths', () => {
+    const generateRoute = fs.readFileSync(
+        new URL('../src/app/api/internal/batch-generate/route.ts', import.meta.url),
+        'utf8'
+    );
+    const editRoute = fs.readFileSync(new URL('../src/app/api/internal/batch-edit/route.ts', import.meta.url), 'utf8');
+    const internalBatchApi = fs.readFileSync(new URL('../src/lib/internal-batch-api.ts', import.meta.url), 'utf8');
+    const imageService = fs.readFileSync(new URL('../src/lib/image-generation-service.ts', import.meta.url), 'utf8');
+    const imageJobQueue = fs.readFileSync(new URL('../src/lib/image-job-queue.ts', import.meta.url), 'utf8');
+
+    assert.match(generateRoute, /mode: 'generate'/);
+    assert.match(editRoute, /mode: 'edit'/);
+    assert.match(internalBatchApi, /assertAbsolutePath\(input\.csvPath, 'csv_path'\)/);
+    assert.match(internalBatchApi, /assertAbsolutePath\(input\.outputDir, 'output_dir'\)/);
+    assert.match(internalBatchApi, /必须是本机绝对路径/);
+    assert.match(internalBatchApi, /input_image_paths 只支持本机绝对路径/);
+    assert.match(internalBatchApi, /formData\.append\('storage_mode', 'fs'\)/);
+    assert.match(internalBatchApi, /formData\.append\('return_absolute_paths', 'true'\)/);
+    assert.match(imageService, /formData\.get\('storage_mode'\) === 'fs'/);
+    assert.match(imageService, /formData\.get\('return_absolute_paths'\) === 'true'/);
+    assert.match(imageJobQueue, /requeueImageJobAfterFailure/);
+    assert.match(imageJobQueue, /queuedJobPayloads\.delete\(jobId\);\s*queuedJobPayloads\.set\(jobId, payload\)/);
+});
+
 test('task queue exposes cancellation for pending jobs', () => {
     const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
     const jobRoute = fs.readFileSync(new URL('../src/app/api/image-jobs/[id]/route.ts', import.meta.url), 'utf8');
@@ -186,6 +230,19 @@ test('task queue exposes cancellation for pending jobs', () => {
     assert.match(playgroundClient, /method: 'DELETE'/);
     assert.match(jobRoute, /cancelPendingImageJobForUser/);
     assert.match(jobRoute, /DELETE/);
+});
+
+test('task queue exposes retry for failed jobs', () => {
+    const taskQueuePanel = fs.readFileSync(new URL('../src/components/task-queue-panel.tsx', import.meta.url), 'utf8');
+    const jobRoute = fs.readFileSync(new URL('../src/app/api/image-jobs/[id]/route.ts', import.meta.url), 'utf8');
+
+    assert.match(taskQueuePanel, /onRetryFailedJob/);
+    assert.match(taskQueuePanel, /job\.status === 'failed'/);
+    assert.match(taskQueuePanel, /aria-label='重试失败任务'/);
+    assert.match(taskQueuePanel, /RotateCcw/);
+    assert.match(playgroundClient, /handleRetryFailedJob/);
+    assert.match(playgroundClient, /action: 'retry'/);
+    assert.match(jobRoute, /retryFailedImageJobForUser/);
 });
 
 test('mode toggle renders as a prominent sliding tab control', () => {

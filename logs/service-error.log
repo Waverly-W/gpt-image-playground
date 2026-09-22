@@ -1,0 +1,92 @@
+[Job job_587ccbac-a7d8-46a8-90e0-7ca46037db64] Failed after 2.2s: Error: 500 image generation service unavailable
+    at eN.generate (.next/server/chunks/src_lib_openai-config_ts_16p8_h-._.js:1:2419)
+    at nf.makeStatusError (.next/server/chunks/src_lib_openai-config_ts_16p8_h-._.js:14:87999)
+    at nf.makeRequest (.next/server/chunks/src_lib_openai-config_ts_16p8_h-._.js:14:92691)
+    at async D (.next/server/chunks/[root-of-the-server]__20_9efs._.js:1:3035)
+    at async h (.next/server/chunks/[root-of-the-server]__20_9efs._.js:69:396) {
+  status: 500,
+  headers: Headers {
+    date: 'Mon, 14 Sep 2026 17:27:07 GMT',
+    'content-type': 'application/json',
+    'content-length': '99',
+    connection: 'keep-alive',
+    server: 'cloudflare',
+    nel: '{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}',
+    'report-to': '{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=mGFboODN437Vf74jYMFfx%2FEH8oGmOuDvWhdvL8XjvU1iIdGZZUnTdr8Qes%2FdfTUTPFMw8YQL%2FmfYjzopvq%2Fi3Dp0405Q%2FhjcFkWFNUtTbS6TdAWZQqtDqcviSto%2FAfv6lMgxyV3l"}]}',
+    'access-control-allow-origin': '*',
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-headers': 'Content-Type, Authorization',
+    'x-request-id': '9bdcb394-b9fc-4894-b122-73e52ecdc443',
+    'cache-control': 'no-cache, no-transform',
+    'cf-cache-status': 'DYNAMIC',
+    'cf-ray': 'a3b119c0dee9bea7-NRT'
+  },
+  requestID: '9bdcb394-b9fc-4894-b122-73e52ecdc443',
+  error: {
+    type: 'internal_error',
+    message: 'image generation service unavailable'
+  },
+  code: undefined,
+  param: undefined,
+  type: 'internal_error'
+}
+[Job job_3bd67309-8446-4126-804f-65a6b2ca3707] Failed after 27.1s: Error: Image data at index 0 is missing base64 data.
+    at <unknown> (.next/server/chunks/[root-of-the-server]__20_9efs._.js:1:3644)
+    at Array.map (<anonymous>)
+    at D (.next/server/chunks/[root-of-the-server]__20_9efs._.js:1:3606)
+    at async h (.next/server/chunks/[root-of-the-server]__20_9efs._.js:69:396)
+⨯ Error: Module did not self-register: '/home/waverly/workspace/gpt-image-playground/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'.
+    at i (.next/server/chunks/[root-of-the-server]__0btky3z._.js:158:5240) {
+  code: 'ERR_DLOPEN_FAILED'
+}
+⨯ Error: Module did not self-register: '/home/waverly/workspace/gpt-image-playground/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'.
+    at i (.next/server/chunks/[root-of-the-server]__0btky3z._.js:158:5240) {
+  code: 'ERR_DLOPEN_FAILED'
+}
+⨯ Error: Module did not self-register: '/home/waverly/workspace/gpt-image-playground/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'.
+    at i (.next/server/chunks/[root-of-the-server]__0btky3z._.js:158:5240) {
+  code: 'ERR_DLOPEN_FAILED'
+}
+⨯ Error: Module did not self-register: '/home/waverly/workspace/gpt-image-playground/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'.
+    at i (.next/server/chunks/[root-of-the-server]__0btky3z._.js:158:5240) {
+  code: 'ERR_DLOPEN_FAILED'
+}
+⨯ Error: Module did not self-register: '/home/waverly/workspace/gpt-image-playground/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'.
+    at i (.next/server/chunks/[root-of-the-server]__0btky3z._.js:158:5240) {
+  code: 'ERR_DLOPEN_FAILED'
+}
+⨯ Error: Module did not self-register: '/home/waverly/workspace/gpt-image-playground/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'.
+    at i (.next/server/chunks/[root-of-the-server]__0btky3z._.js:158:5240) {
+  code: 'ERR_DLOPEN_FAILED'
+}
+⨯ Error: Module did not self-register: '/home/waverly/workspace/gpt-image-playground/node_modules/.pnpm/better-sqlite3@12.11.1/node_modules/better-sqlite3/build/Release/better_sqlite3.node'.
+    at i (.next/server/chunks/[root-of-the-server]__0btky3z._.js:158:5240) {
+  code: 'ERR_DLOPEN_FAILED'
+}
+[Job job_fdb9176a-ed5b-40de-8eca-4f98fe2c77c9] Failed after 1.7s: Error: 400 No credentials for provider: openai
+    at eN.generate (.next/server/chunks/src_lib_openai-config_ts_16p8_h-._.js:1:2252)
+    at nf.makeStatusError (.next/server/chunks/src_lib_openai-config_ts_16p8_h-._.js:14:87999)
+    at nf.makeRequest (.next/server/chunks/src_lib_openai-config_ts_16p8_h-._.js:14:92691)
+    at async D (.next/server/chunks/[root-of-the-server]__20_9efs._.js:1:3035)
+    at async h (.next/server/chunks/[root-of-the-server]__20_9efs._.js:69:396) {
+  status: 400,
+  headers: Headers {
+    server: 'nginx/1.30.4',
+    date: 'Tue, 15 Sep 2026 03:03:45 GMT',
+    'content-type': 'application/json',
+    'transfer-encoding': 'chunked',
+    connection: 'keep-alive',
+    vary: 'rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch',
+    'access-control-allow-origin': '*'
+  },
+  requestID: null,
+  error: {
+    message: 'No credentials for provider: openai',
+    type: 'invalid_request_error',
+    code: 'bad_request'
+  },
+  code: 'bad_request',
+  param: undefined,
+  type: 'invalid_request_error'
+}
+Invalid or missing usage data for cost calculation: undefined

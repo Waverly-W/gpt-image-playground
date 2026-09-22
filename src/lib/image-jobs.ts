@@ -1,8 +1,5 @@
 import type { CostDetails, GptImageModel } from './cost-utils';
-import {
-    normalizeQualityFailureReasons,
-    type ImageJobQualityFeedback
-} from './image-quality-feedback';
+import { normalizeQualityFailureReasons, type ImageJobQualityFeedback } from './image-quality-feedback';
 import type { ImageStorageMode } from './settings';
 import { getDb } from './sqlite-db';
 import crypto from 'crypto';
@@ -215,9 +212,10 @@ export function updateImageJobQualityFeedbackForUser(
     id: string,
     ownerUserId: string,
     input: UpdateImageJobQualityFeedbackInput,
-    updatedAt = nowIso()
+    updatedAt = nowIso(),
+    isAdmin = false
 ): ImageJob | null {
-    const existing = getImageJobForUser(id, ownerUserId);
+    const existing = getImageJobForUser(id, ownerUserId, isAdmin);
     if (!existing) return null;
 
     const failureReasons = normalizeQualityFailureReasons(input.failureReasons);
@@ -235,13 +233,23 @@ export function updateImageJobQualityFeedbackForUser(
         params.quality_feedback = feedback;
     }
 
-    getDb()
-        .prepare(
-            `UPDATE image_jobs
-             SET params_json = ?, updated_at = ?
-             WHERE id = ? AND owner_user_id = ?`
-        )
-        .run(JSON.stringify(params), updatedAt, id, ownerUserId);
+    if (isAdmin) {
+        getDb()
+            .prepare(
+                `UPDATE image_jobs
+                 SET params_json = ?, updated_at = ?
+                 WHERE id = ?`
+            )
+            .run(JSON.stringify(params), updatedAt, id);
+    } else {
+        getDb()
+            .prepare(
+                `UPDATE image_jobs
+                 SET params_json = ?, updated_at = ?
+                 WHERE id = ? AND owner_user_id = ?`
+            )
+            .run(JSON.stringify(params), updatedAt, id, ownerUserId);
+    }
 
     return getImageJobById(id);
 }
@@ -259,10 +267,89 @@ export function failImageJob(id: string, error: string): ImageJob {
     return getImageJobById(id);
 }
 
-export function getImageJobForUser(id: string, ownerUserId: string): ImageJob | null {
-    const row = getDb().prepare('SELECT * FROM image_jobs WHERE id = ? AND owner_user_id = ?').get(id, ownerUserId) as
-        | ImageJobRow
-        | undefined;
+export function retryFailedImageJobForUser(id: string, ownerUserId: string, isAdmin = false): ImageJob | null {
+    const now = nowIso();
+    const result = isAdmin
+        ? getDb()
+              .prepare(
+                  `UPDATE image_jobs
+                   SET status = 'pending',
+                       images_json = '[]',
+                       preview_image_json = NULL,
+                       usage_json = NULL,
+                       cost_json = NULL,
+                       storage_mode_used = NULL,
+                       duration_ms = NULL,
+                       error = NULL,
+                       updated_at = ?,
+                       started_at = NULL,
+                       finished_at = NULL
+                   WHERE id = ? AND status = 'failed'`
+              )
+              .run(now, id)
+        : getDb()
+              .prepare(
+                  `UPDATE image_jobs
+                   SET status = 'pending',
+                       images_json = '[]',
+                       preview_image_json = NULL,
+                       usage_json = NULL,
+                       cost_json = NULL,
+                       storage_mode_used = NULL,
+                       duration_ms = NULL,
+                       error = NULL,
+                       updated_at = ?,
+                       started_at = NULL,
+                       finished_at = NULL
+                   WHERE id = ? AND owner_user_id = ? AND status = 'failed'`
+              )
+              .run(now, id, ownerUserId);
+
+    return result.changes > 0 ? getImageJobById(id) : null;
+}
+
+export function requeueImageJobAfterFailure(
+    id: string,
+    error: string,
+    paramsPatch: Record<string, unknown> = {},
+    requeuedAt = nowIso()
+): ImageJob {
+    const existing = getImageJobById(id);
+    const params = {
+        ...existing.params,
+        ...paramsPatch,
+        last_error: paramsPatch.last_error ?? error
+    };
+
+    getDb()
+        .prepare(
+            `UPDATE image_jobs
+             SET status = 'pending',
+                 params_json = ?,
+                 images_json = '[]',
+                 preview_image_json = NULL,
+                 usage_json = NULL,
+                 cost_json = NULL,
+                 storage_mode_used = NULL,
+                 duration_ms = NULL,
+                 error = NULL,
+                 created_at = ?,
+                 updated_at = ?,
+                 started_at = NULL,
+                 finished_at = NULL
+             WHERE id = ?`
+        )
+        .run(JSON.stringify(params), requeuedAt, requeuedAt, id);
+
+    return getImageJobById(id);
+}
+
+export function getImageJobForUser(id: string, ownerUserId: string, isAdmin = false): ImageJob | null {
+    const row = (
+        isAdmin
+            ? getDb().prepare('SELECT * FROM image_jobs WHERE id = ?').get(id)
+            : getDb().prepare('SELECT * FROM image_jobs WHERE id = ? AND owner_user_id = ?').get(id, ownerUserId)
+    ) as ImageJobRow | undefined;
 
     return row ? toImageJob(row) : null;
 }
@@ -275,15 +362,23 @@ export function listImageJobsForUser(ownerUserId: string, limit = 100): ImageJob
     return rows.map(toImageJob);
 }
 
+export function listAllImageJobs(limit = 100): ImageJob[] {
+    const rows = getDb()
+        .prepare('SELECT * FROM image_jobs ORDER BY updated_at DESC LIMIT ?')
+        .all(limit) as ImageJobRow[];
+
+    return rows.map(toImageJob);
+}
+
 export function deleteImageJobsForUser(ownerUserId: string): number {
     const result = getDb().prepare('DELETE FROM image_jobs WHERE owner_user_id = ?').run(ownerUserId);
     return result.changes;
 }
 
-export function cancelPendingImageJobForUser(id: string, ownerUserId: string): boolean {
-    const result = getDb()
-        .prepare("DELETE FROM image_jobs WHERE id = ? AND owner_user_id = ? AND status = 'pending'")
-        .run(id, ownerUserId);
+export function cancelPendingImageJobForUser(id: string, ownerUserId: string, isAdmin = false): boolean {
+    const result = isAdmin
+        ? getDb().prepare("DELETE FROM image_jobs WHERE id = ? AND status = 'pending'").run(id)
+        : getDb().prepare("DELETE FROM image_jobs WHERE id = ? AND owner_user_id = ? AND status = 'pending'").run(id, ownerUserId);
     return result.changes > 0;
 }
 

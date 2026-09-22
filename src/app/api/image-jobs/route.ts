@@ -1,26 +1,17 @@
-import { calculateApiCost, type GptImageModel } from '@/lib/cost-utils';
-import { runImageGeneration, runStreamingImageGeneration } from '@/lib/image-generation-service';
+import { type GptImageModel } from '@/lib/cost-utils';
+import { deleteQueuedImageJobPayloadsForUser, enqueueImageJobPayload, scheduleImageJobs } from '@/lib/image-job-queue';
 import {
     createImageJob,
-    countRunningImageJobs,
     deleteImageJobsForUser,
-    failImageJob,
     failStaleRunningImageJobs,
-    listImageJobsForUser,
-    listPendingImageJobs,
-    markImageJobRunning,
-    completeImageJob,
-    updateImageJobPreview
+    listAllImageJobs,
+    listImageJobsForUser
 } from '@/lib/image-jobs';
 import { buildPromptFromFormData, serializeBuiltPromptForParams } from '@/lib/prompt-builder/build-prompt';
 import { authErrorResponse, requireSession } from '@/lib/server-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
-const MAX_PARALLEL_IMAGE_JOBS = 5;
 const IMAGE_JOB_TIMEOUT_MS = 5 * 60 * 1000;
-
-const queuedJobPayloads = new Map<string, { ownerUserId: string; formData: FormData; model: GptImageModel }>();
-const activeJobIds = new Set<string>();
 
 function serializeJobParams(formData: FormData): Record<string, unknown> {
     const params: Record<string, unknown> = {};
@@ -44,64 +35,23 @@ function getErrorStatus(error: unknown): number {
     return 500;
 }
 
-async function runJobInBackground(jobId: string, ownerUserId: string, formData: FormData, model: GptImageModel) {
-    const startTime = Date.now();
-    try {
-        activeJobIds.add(jobId);
-        markImageJobRunning(jobId);
-        const streamEnabled = formData.get('stream') === 'true';
-        const n = parseInt((formData.get('n') as string) || '1', 10);
-        const result =
-            streamEnabled && n === 1
-                ? await runStreamingImageGeneration(formData, ownerUserId, (preview) => {
-                      updateImageJobPreview(jobId, preview);
-                  })
-                : await runImageGeneration(formData, ownerUserId);
-        const costDetails = calculateApiCost(result.usage, model);
-
-        completeImageJob(jobId, {
-            images: result.images.map((image) => ({
-                filename: image.filename,
-                output_format: image.output_format,
-                path: image.path
-            })),
-            usage: result.usage,
-            costDetails,
-            storageModeUsed: result.storageMode,
-            durationMs: Date.now() - startTime
-        });
-    } catch (error) {
-        failImageJob(jobId, error instanceof Error ? error.message : 'Image generation failed.');
-    } finally {
-        activeJobIds.delete(jobId);
-        queuedJobPayloads.delete(jobId);
-        scheduleImageJobs();
-    }
-}
-
-function scheduleImageJobs() {
-    failStaleRunningImageJobs(IMAGE_JOB_TIMEOUT_MS);
-
-    const availableSlots = MAX_PARALLEL_IMAGE_JOBS - countRunningImageJobs();
-    if (availableSlots <= 0) return;
-
-    const jobsToStart = listPendingImageJobs(100)
-        .filter((job) => queuedJobPayloads.has(job.id))
-        .slice(0, availableSlots);
-
-    jobsToStart.forEach((job) => {
-        const payload = queuedJobPayloads.get(job.id);
-        if (!payload || activeJobIds.has(job.id)) return;
-        void runJobInBackground(job.id, payload.ownerUserId, payload.formData, payload.model);
-    });
-}
-
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const session = await requireSession();
         failStaleRunningImageJobs(IMAGE_JOB_TIMEOUT_MS);
         scheduleImageJobs();
-        return NextResponse.json({ jobs: listImageJobsForUser(session.id) });
+
+        const scope = request.nextUrl.searchParams.get('scope');
+        const jobs =
+            session.role === 'admin' && scope !== 'mine'
+                ? listAllImageJobs(200)
+                : listImageJobsForUser(session.id, 200);
+
+        return NextResponse.json({
+            jobs,
+            canViewAll: session.role === 'admin',
+            currentScope: session.role === 'admin' ? (scope === 'mine' ? 'mine' : 'all') : 'mine'
+        });
     } catch (error) {
         return authErrorResponse(error) ?? NextResponse.json({ error: 'Failed to list image jobs.' }, { status: 500 });
     }
@@ -137,7 +87,7 @@ export async function POST(request: NextRequest) {
             }
         });
 
-        queuedJobPayloads.set(job.id, { ownerUserId: session.id, formData, model });
+        enqueueImageJobPayload(job.id, { ownerUserId: session.id, formData, model });
         scheduleImageJobs();
 
         return NextResponse.json({ job }, { status: 202 });
@@ -151,6 +101,7 @@ export async function DELETE() {
     try {
         const session = await requireSession();
         const deleted = deleteImageJobsForUser(session.id);
+        deleteQueuedImageJobPayloadsForUser(session.id);
         return NextResponse.json({ deleted });
     } catch (error) {
         return authErrorResponse(error) ?? NextResponse.json({ error: 'Failed to clear image jobs.' }, { status: 500 });

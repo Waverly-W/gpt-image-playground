@@ -1,0 +1,71 @@
+[Job job_81fedfe8-d991-46d4-abe7-49daab3039b3] Starting generation for user 'admin' with model 'gpt-image-2'...
+[Job job_81fedfe8-d991-46d4-abe7-49daab3039b3] Completed in 71.4s, 1 image(s) created
+▲ Next.js 16.3.4
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 147ms
+✓ Running next.config.ts took 38ms
+▲ Next.js 16.3.4
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 147ms
+✓ Running next.config.ts took 35ms
+[internal/edits] Received POST request
+[internal/edits] Calling runImageGeneration with model=gpt-image-2, prompt=超高清 8K 300DPI 景泰蓝掐丝金属冰箱贴，纯白背景...
+[internal/edits] runImageGeneration completed in 315833ms
+[internal/edits] Success: filename=1788977280610-0d88231a-eb43-4c00-a783-649d4516f125-0.png, imageUrl=https://pic.waverlywang.top/1788977280610-0d88231a-eb43-4c00-a783-649d4516f125-0.png, localPath=/home/waverly/workspace/ai-fridge-magnet/backend/data/uploads/1788977280610-0d88231a-eb43-4c00-a783-649d4516f125-0.png
+▲ Next.js 16.3.4
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 138ms
+✓ Running next.config.ts took 41ms
+▲ Next.js 16.3.4
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 140ms
+✓ Running next.config.ts took 36ms
+▲ Next.js 16.3.4
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 441ms
+✓ Running next.config.ts took 138ms
+▲ Next.js 16.3.4
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 574ms
+✓ Running next.config.ts took 472ms
+[Job job_587ccbac-a7d8-46a8-90e0-7ca46037db64] Starting generation for user 'admin' with model 'gpt-image-2'...
+[Job job_3bd67309-8446-4126-804f-65a6b2ca3707] Starting generation for user 'admin' with model 'gpt-image-2'...
+▲ Next.js 16.3.4
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 170ms
+✓ Running next.config.ts took 127ms
+▲ Next.js 16.3.4
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 374ms
+✓ Running next.config.ts took 37ms
+▲ Next.js 16.3.4
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 135ms
+✓ Running next.config.ts took 32ms
+▲ Next.js 16.3.4
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 141ms
+✓ Running next.config.ts took 33ms
+[Job job_fdb9176a-ed5b-40de-8eca-4f98fe2c77c9] Starting generation for user 'admin' with model 'gpt-image-2'...
+▲ Next.js 16.3.4
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 143ms
+✓ Running next.config.ts took 39ms
+▲ Next.js 16.3.4
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 134ms
+✓ Running next.config.ts took 30ms
+[Job job_f045c702-a496-4110-951f-2c8ce5954e37] Starting generation for user 'admin' with model 'ag/gemini-3.1-flash-image'...
+[Job job_f045c702-a496-4110-951f-2c8ce5954e37] Completed in 19.3s, 1 image(s) created

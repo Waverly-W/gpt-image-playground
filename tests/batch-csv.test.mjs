@@ -18,6 +18,17 @@ const defaults = {
     partial_images: 2
 };
 
+const editDefaults = {
+    model: 'gpt-image-2',
+    n: 1,
+    size: 'auto',
+    customWidth: 1024,
+    customHeight: 1024,
+    quality: 'auto',
+    stream: false,
+    partial_images: 2
+};
+
 test('exports a batch CSV template with generation parameter columns', () => {
     const template = batch.createBatchCsvTemplate(defaults);
     const [header, example] = template.trim().split('\n');
@@ -121,6 +132,105 @@ test('converts parsed rows to API form data in CSV order', () => {
         ['output_compression', '75'],
         ['background', 'auto'],
         ['moderation', 'low'],
+        ['stream', 'true'],
+        ['partial_images', '3']
+    ]);
+});
+
+test('exports a batch edit CSV template with input image path column', () => {
+    const template = batch.createBatchEditCsvTemplate(editDefaults);
+    const [header, example] = template.trim().split('\n');
+
+    assert.equal(header, 'prompt,input_image_paths,model,n,size,width,height,quality,stream,partial_images');
+    assert.match(
+        example,
+        /^"把输入图片改成复古海报风格","\.\/examples\/input\.png;\.\/examples\/style\.png",gpt-image-2,1,auto/
+    );
+});
+
+test('parses batch edit rows with semicolon-separated input image paths', () => {
+    const csv = [
+        'prompt,input_image_paths,model,n,size,width,height,quality,stream,partial_images',
+        '"make it warmer","./a.png; ./b.png",,,,,,,,',
+        '"custom edit","/tmp/input.png",gpt-image-2,1,custom,2048,1024,medium,true,3'
+    ].join('\n');
+
+    const result = batch.parseBatchEditCsv(csv, editDefaults);
+
+    assert.equal(result.errors.length, 0);
+    assert.deepEqual(result.rows, [
+        {
+            line: 2,
+            prompt: 'make it warmer',
+            inputImagePaths: ['./a.png', './b.png'],
+            model: 'gpt-image-2',
+            n: 1,
+            size: 'auto',
+            customWidth: 1024,
+            customHeight: 1024,
+            quality: 'auto',
+            stream: false,
+            partial_images: 2
+        },
+        {
+            line: 3,
+            prompt: 'custom edit',
+            inputImagePaths: ['/tmp/input.png'],
+            model: 'gpt-image-2',
+            n: 1,
+            size: 'custom',
+            customWidth: 2048,
+            customHeight: 1024,
+            quality: 'medium',
+            stream: true,
+            partial_images: 3
+        }
+    ]);
+});
+
+test('reports batch edit validation errors with line numbers', () => {
+    const csv = [
+        'prompt,input_image_paths,model,n,size,width,height,quality,stream,partial_images',
+        ',,gpt-image-2,1,auto,,,,,',
+        'valid prompt,./input.png,bad-model,11,custom,17,1024,ultra,yes,4'
+    ].join('\n');
+
+    const result = batch.parseBatchEditCsv(csv, editDefaults);
+
+    assert.equal(result.rows.length, 0);
+    assert.deepEqual(result.errors, [
+        '第 2 行：prompt 不能为空。',
+        '第 2 行：input_image_paths 不能为空。',
+        '第 3 行：model 必须是 gpt-image-2、gpt-image-1.5、gpt-image-1 或 gpt-image-1-mini。',
+        '第 3 行：n 必须是 1 到 10 的整数。',
+        '第 3 行：custom 尺寸需要合法的 width 和 height。宽度和高度都必须是 16 的倍数。',
+        '第 3 行：quality 必须是 auto、low、medium 或 high。',
+        '第 3 行：partial_images 必须是 1、2 或 3。'
+    ]);
+});
+
+test('converts parsed edit rows to API form data with image path entries', () => {
+    const [row] = batch.parseBatchEditCsv(
+        [
+            'prompt,input_image_paths,model,n,size,width,height,quality,stream,partial_images',
+            'custom edit,"./a.png;./b.png",gpt-image-2,1,custom,2048,1024,medium,true,3'
+        ].join('\n'),
+        editDefaults
+    ).rows;
+
+    const formData = batch.createBatchEditJobFormData(row);
+
+    assert.deepEqual(Array.from(formData.entries()), [
+        ['mode', 'edit'],
+        ['model', 'gpt-image-2'],
+        ['prompt', 'custom edit'],
+        ['n', '1'],
+        ['size', '2048x1024'],
+        ['quality', 'medium'],
+        ['image_path_0', './a.png'],
+        ['image_role_0', 'source-image'],
+        ['image_path_1', './b.png'],
+        ['image_role_1', 'content-asset'],
         ['stream', 'true'],
         ['partial_images', '3']
     ]);

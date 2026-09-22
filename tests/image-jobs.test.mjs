@@ -346,3 +346,90 @@ test('cancels only pending image jobs owned by the requester', () => {
     assert.equal(jobs.cancelPendingImageJobForUser(other.id, owner), false);
     assert.equal(jobs.getImageJobForUser(other.id, 'usr_cancel_other')?.id, other.id);
 });
+
+test('requeues only failed image jobs owned by the requester', () => {
+    const owner = `usr_retry_${Date.now()}`;
+    const failedJob = jobs.createImageJob({
+        ownerUserId: owner,
+        mode: 'generate',
+        prompt: 'retry failed',
+        model: 'gpt-image-2',
+        params: {}
+    });
+    const pendingJob = jobs.createImageJob({
+        ownerUserId: owner,
+        mode: 'generate',
+        prompt: 'already pending',
+        model: 'gpt-image-2',
+        params: {}
+    });
+    const otherJob = jobs.createImageJob({
+        ownerUserId: 'usr_retry_other',
+        mode: 'generate',
+        prompt: 'other failed',
+        model: 'gpt-image-2',
+        params: {}
+    });
+
+    jobs.failImageJob(failedJob.id, 'OpenAI timed out');
+    jobs.failImageJob(otherJob.id, 'Other user timeout');
+
+    const retried = jobs.retryFailedImageJobForUser(failedJob.id, owner);
+
+    assert.equal(retried?.status, 'pending');
+    assert.equal(retried?.error, null);
+    assert.equal(retried?.startedAt, null);
+    assert.equal(retried?.finishedAt, null);
+    assert.equal(jobs.retryFailedImageJobForUser(pendingJob.id, owner), null);
+    assert.equal(jobs.retryFailedImageJobForUser(otherJob.id, owner), null);
+    assert.equal(jobs.getImageJobForUser(otherJob.id, 'usr_retry_other')?.status, 'failed');
+});
+
+test('requeues a failed image job at the tail with retry metadata', () => {
+    const owner = `usr_auto_retry_${Date.now()}`;
+    const first = jobs.createImageJob({
+        ownerUserId: owner,
+        mode: 'generate',
+        prompt: 'first pending',
+        model: 'gpt-image-2',
+        params: {}
+    });
+    const failedJob = jobs.createImageJob({
+        ownerUserId: owner,
+        mode: 'generate',
+        prompt: 'auto retry failed',
+        model: 'gpt-image-2',
+        params: { auto_retry: 'true' }
+    });
+    const second = jobs.createImageJob({
+        ownerUserId: owner,
+        mode: 'generate',
+        prompt: 'second pending',
+        model: 'gpt-image-2',
+        params: {}
+    });
+
+    jobs.failImageJob(failedJob.id, 'temporary failure');
+    const requeued = jobs.requeueImageJobAfterFailure(
+        failedJob.id,
+        'temporary failure',
+        {
+            auto_retry_attempts: 1,
+            last_error: 'temporary failure'
+        },
+        '2999-01-01T00:00:00.000Z'
+    );
+
+    assert.equal(requeued.status, 'pending');
+    assert.equal(requeued.error, null);
+    assert.equal(requeued.startedAt, null);
+    assert.equal(requeued.finishedAt, null);
+    assert.equal(requeued.params.auto_retry_attempts, 1);
+    assert.equal(requeued.params.last_error, 'temporary failure');
+
+    const pendingForOwner = jobs.listPendingImageJobs(100).filter((job) => job.ownerUserId === owner);
+    assert.deepEqual(
+        pendingForOwner.map((job) => job.id),
+        [first.id, second.id, failedJob.id]
+    );
+});

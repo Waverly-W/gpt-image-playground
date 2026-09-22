@@ -21,8 +21,30 @@ export type BatchGenerationRow = BatchGenerationDefaults & {
     prompt: string;
 };
 
+export type BatchEditDefaults = {
+    model: GptImageModel;
+    n: number;
+    size: SizePreset;
+    customWidth: number;
+    customHeight: number;
+    quality: 'low' | 'medium' | 'high' | 'auto';
+    stream: boolean;
+    partial_images: 1 | 2 | 3;
+};
+
+export type BatchEditRow = BatchEditDefaults & {
+    line: number;
+    prompt: string;
+    inputImagePaths: string[];
+};
+
 export type BatchCsvParseResult = {
     rows: BatchGenerationRow[];
+    errors: string[];
+};
+
+export type BatchEditCsvParseResult = {
+    rows: BatchEditRow[];
     errors: string[];
 };
 
@@ -38,6 +60,19 @@ const CSV_COLUMNS = [
     'output_compression',
     'background',
     'moderation',
+    'stream',
+    'partial_images'
+] as const;
+
+const EDIT_CSV_COLUMNS = [
+    'prompt',
+    'input_image_paths',
+    'model',
+    'n',
+    'size',
+    'width',
+    'height',
+    'quality',
     'stream',
     'partial_images'
 ] as const;
@@ -121,6 +156,13 @@ function getCell(cells: string[], index: number): string {
     return cells[index]?.trim() ?? '';
 }
 
+function parseInputImagePaths(value: string): string[] {
+    return value
+        .split(';')
+        .map((path) => path.trim())
+        .filter(Boolean);
+}
+
 export function createBatchCsvTemplate(defaults: BatchGenerationDefaults): string {
     const example = [
         '一只写实风格的猫宇航员漂浮在太空中',
@@ -139,6 +181,23 @@ export function createBatchCsvTemplate(defaults: BatchGenerationDefaults): strin
     ];
 
     return `${CSV_COLUMNS.join(',')}\n${example.map((value, index) => escapeCsvCell(value, index === 0)).join(',')}\n`;
+}
+
+export function createBatchEditCsvTemplate(defaults: BatchEditDefaults): string {
+    const example = [
+        '把输入图片改成复古海报风格',
+        './examples/input.png;./examples/style.png',
+        defaults.model,
+        defaults.n,
+        defaults.size,
+        defaults.customWidth,
+        defaults.customHeight,
+        defaults.quality,
+        defaults.stream,
+        defaults.partial_images
+    ];
+
+    return `${EDIT_CSV_COLUMNS.join(',')}\n${example.map((value, index) => escapeCsvCell(value, index <= 1)).join(',')}\n`;
 }
 
 export function parseBatchCsv(text: string, defaults: BatchGenerationDefaults): BatchCsvParseResult {
@@ -213,6 +272,68 @@ export function parseBatchCsv(text: string, defaults: BatchGenerationDefaults): 
     return { rows, errors };
 }
 
+export function parseBatchEditCsv(text: string, defaults: BatchEditDefaults): BatchEditCsvParseResult {
+    const csvRows = parseCsv(text);
+    const [header, ...body] = csvRows;
+    const errors: string[] = [];
+    const rows: BatchEditRow[] = [];
+
+    if (!header || header.map((cell) => cell.trim()).join(',') !== EDIT_CSV_COLUMNS.join(',')) {
+        return { rows: [], errors: [`CSV 表头必须是：${EDIT_CSV_COLUMNS.join(',')}`] };
+    }
+
+    body.forEach((cells, index) => {
+        const line = index + 2;
+        const rowErrors: string[] = [];
+        const prompt = getCell(cells, 0);
+        const inputImagePaths = parseInputImagePaths(getCell(cells, 1));
+        const model = (getCell(cells, 2) || defaults.model) as GptImageModel;
+        const n = readInteger(getCell(cells, 3), defaults.n);
+        const size = (getCell(cells, 4) || defaults.size) as SizePreset;
+        const customWidth = readDimension(getCell(cells, 5), defaults.customWidth, size);
+        const customHeight = readDimension(getCell(cells, 6), defaults.customHeight, size);
+        const quality = (getCell(cells, 7) || defaults.quality) as BatchEditDefaults['quality'];
+        const stream = readBoolean(getCell(cells, 8), defaults.stream);
+        const partialImages = readInteger(getCell(cells, 9), defaults.partial_images) as 1 | 2 | 3;
+
+        if (!prompt) rowErrors.push('prompt 不能为空。');
+        if (inputImagePaths.length === 0) rowErrors.push('input_image_paths 不能为空。');
+        if (inputImagePaths.length > 10) rowErrors.push('input_image_paths 最多支持 10 张图片。');
+        if (!MODELS.includes(model)) {
+            rowErrors.push('model 必须是 gpt-image-2、gpt-image-1.5、gpt-image-1 或 gpt-image-1-mini。');
+        }
+        if (!Number.isInteger(n) || n < 1 || n > 10) rowErrors.push('n 必须是 1 到 10 的整数。');
+        if (!SIZES.includes(size)) rowErrors.push('size 必须是 auto、custom、square、landscape 或 portrait。');
+        if (size === 'custom') {
+            const validation = validateGptImage2Size(customWidth, customHeight);
+            if (!validation.valid) rowErrors.push(`custom 尺寸需要合法的 width 和 height。${validation.reason}`);
+        }
+        if (!QUALITIES.includes(quality)) rowErrors.push('quality 必须是 auto、low、medium 或 high。');
+        if (!PARTIAL_IMAGE_COUNTS.includes(partialImages)) rowErrors.push('partial_images 必须是 1、2 或 3。');
+
+        if (rowErrors.length > 0) {
+            rowErrors.forEach((error) => errors.push(`第 ${line} 行：${error}`));
+            return;
+        }
+
+        rows.push({
+            line,
+            prompt,
+            inputImagePaths,
+            model,
+            n,
+            size,
+            customWidth,
+            customHeight,
+            quality,
+            stream,
+            partial_images: partialImages
+        });
+    });
+
+    return { rows, errors };
+}
+
 export function createBatchJobFormData(row: BatchGenerationRow): FormData {
     const formData = new FormData();
     const size =
@@ -232,6 +353,31 @@ export function createBatchJobFormData(row: BatchGenerationRow): FormData {
     }
     formData.append('background', row.background);
     formData.append('moderation', row.moderation);
+    if (row.stream && row.n === 1) {
+        formData.append('stream', 'true');
+        formData.append('partial_images', row.partial_images.toString());
+    }
+
+    return formData;
+}
+
+export function createBatchEditJobFormData(row: BatchEditRow): FormData {
+    const formData = new FormData();
+    const size =
+        row.size === 'custom'
+            ? `${row.customWidth}x${row.customHeight}`
+            : (getPresetDimensions(row.size, row.model) ?? row.size);
+
+    formData.append('mode', 'edit');
+    formData.append('model', row.model);
+    formData.append('prompt', row.prompt);
+    formData.append('n', row.n.toString());
+    formData.append('size', size);
+    formData.append('quality', row.quality);
+    row.inputImagePaths.forEach((imagePath, index) => {
+        formData.append(`image_path_${index}`, imagePath);
+        formData.append(`image_role_${index}`, index === 0 ? 'source-image' : 'content-asset');
+    });
     if (row.stream && row.n === 1) {
         formData.append('stream', 'true');
         formData.append('partial_images', row.partial_images.toString());

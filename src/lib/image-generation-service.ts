@@ -2,6 +2,7 @@ import { recordImageOwner } from '@/lib/image-ownership';
 import { putR2Image, resolveImageStorageMode, type ImageStorageMode } from '@/lib/image-storage';
 import { createOpenAIClient, getOpenAIConfig } from '@/lib/openai-config';
 import { buildPromptFromFormData } from '@/lib/prompt-builder/build-prompt';
+import crypto from 'crypto';
 import fs from 'fs/promises';
 import { lookup } from 'mime-types';
 import type OpenAI from 'openai';
@@ -41,12 +42,16 @@ function validateOutputFormat(format: unknown): ValidOutputFormat {
     return 'png';
 }
 
-async function ensureOutputDirExists() {
+function createImageFilename(fileExtension: ValidOutputFormat, index: number, timestamp = Date.now()): string {
+    return `${timestamp}-${crypto.randomUUID()}-${index}.${fileExtension}`;
+}
+
+async function ensureOutputDirExists(directory = outputDir) {
     try {
-        await fs.access(outputDir);
+        await fs.access(directory);
     } catch (error: unknown) {
         if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') {
-            await fs.mkdir(outputDir, { recursive: true });
+            await fs.mkdir(directory, { recursive: true });
             return;
         }
 
@@ -56,32 +61,95 @@ async function ensureOutputDirExists() {
     }
 }
 
-function resolvePersistedStorageMode(): ImageStorageMode {
+function resolvePersistedStorageMode(formData: FormData): ImageStorageMode {
+    if (formData.get('storage_mode') === 'fs' || formData.get('force_local_output') === 'true') {
+        return 'fs';
+    }
+
     const mode = resolveImageStorageMode();
     return mode === 'indexeddb' ? 'fs' : mode;
+}
+
+function getLocalOutputDir(formData: FormData): string {
+    const requestedOutputDir = formData.get('output_dir');
+    if (typeof requestedOutputDir === 'string' && requestedOutputDir.trim()) {
+        if (!path.isAbsolute(requestedOutputDir)) {
+            throw new Error('output_dir must be an absolute local path.');
+        }
+
+        return requestedOutputDir;
+    }
+
+    return outputDir;
+}
+
+function shouldReturnAbsolutePaths(formData: FormData): boolean {
+    return formData.get('return_absolute_paths') === 'true';
 }
 
 async function persistGeneratedImage({
     b64Json,
     filename,
     ownerUserId,
-    storageMode
+    storageMode,
+    localOutputDir
 }: {
     b64Json: string;
     filename: string;
     ownerUserId: string;
     storageMode: ImageStorageMode;
-}) {
+    localOutputDir: string;
+}): Promise<string | undefined> {
     const buffer = Buffer.from(b64Json, 'base64');
 
     if (storageMode === 'fs') {
-        const filepath = path.join(outputDir, filename);
+        const filepath = path.join(localOutputDir, filename);
         await fs.writeFile(filepath, buffer);
+        recordImageOwner(filename, ownerUserId);
+        return filepath;
     } else {
         await putR2Image(filename, buffer, lookup(filename) || undefined);
     }
 
     recordImageOwner(filename, ownerUserId);
+    return undefined;
+}
+
+function getIndexedEntries<T extends FormDataEntryValue>(
+    formData: FormData,
+    pattern: RegExp,
+    predicate: (value: FormDataEntryValue) => value is T
+): T[] {
+    return Array.from(formData.entries())
+        .map(([key, value]) => ({ match: pattern.exec(key), value }))
+        .filter(
+            (entry): entry is { match: RegExpExecArray; value: T } => Boolean(entry.match) && predicate(entry.value)
+        )
+        .sort((a, b) => Number(a.match[1]) - Number(b.match[1]))
+        .map((entry) => entry.value);
+}
+
+function isFile(value: FormDataEntryValue): value is File {
+    return value instanceof File;
+}
+
+function isNonEmptyString(value: FormDataEntryValue): value is string {
+    return typeof value === 'string' && value.trim().length > 0;
+}
+
+async function fileFromPath(inputPath: string): Promise<File> {
+    const resolvedPath = path.isAbsolute(inputPath) ? inputPath : path.resolve(process.cwd(), inputPath);
+    const bytes = await fs.readFile(resolvedPath);
+    const filename = path.basename(resolvedPath);
+    return new File([bytes], filename, { type: lookup(filename) || 'application/octet-stream' });
+}
+
+async function getEditImageFilesFromFormData(formData: FormData): Promise<File[]> {
+    const uploadedFiles = getIndexedEntries(formData, /^image_(\d+)$/, isFile);
+    const imagePaths = getIndexedEntries(formData, /^image_path_(\d+)$/, isNonEmptyString);
+    const pathFiles = await Promise.all(imagePaths.map(fileFromPath));
+
+    return [...uploadedFiles, ...pathFiles];
 }
 
 export async function runImageGeneration(formData: FormData, ownerUserId: string): Promise<ImageGenerationResult> {
@@ -90,9 +158,11 @@ export async function runImageGeneration(formData: FormData, ownerUserId: string
         throw new Error('Server configuration error: API key not found.');
     }
 
-    const effectiveStorageMode = resolvePersistedStorageMode();
+    const effectiveStorageMode = resolvePersistedStorageMode(formData);
+    const localOutputDir = getLocalOutputDir(formData);
+    const returnAbsolutePaths = shouldReturnAbsolutePaths(formData);
     if (effectiveStorageMode === 'fs') {
-        await ensureOutputDirExists();
+        await ensureOutputDirExists(localOutputDir);
     }
 
     const mode = formData.get('mode') as 'generate' | 'edit' | null;
@@ -142,13 +212,7 @@ export async function runImageGeneration(formData: FormData, ownerUserId: string
         const n = parseInt((formData.get('n') as string) || '1', 10);
         const size = ((formData.get('size') as string) || 'auto') as OpenAI.Images.ImageEditParams['size'];
         const quality = (formData.get('quality') as OpenAI.Images.ImageEditParams['quality']) || 'auto';
-        const imageFiles: File[] = [];
-
-        for (const [key, value] of formData.entries()) {
-            if (key.startsWith('image_') && value instanceof File) {
-                imageFiles.push(value);
-            }
-        }
+        const imageFiles = await getEditImageFilesFromFormData(formData);
 
         if (imageFiles.length === 0) {
             throw new Error('No image file provided for editing.');
@@ -178,21 +242,21 @@ export async function runImageGeneration(formData: FormData, ownerUserId: string
                 throw new Error(`Image data at index ${index} is missing base64 data.`);
             }
 
-            const timestamp = Date.now();
             const fileExtension = validateOutputFormat(mode === 'edit' ? 'png' : formData.get('output_format'));
-            const filename = `${timestamp}-${index}.${fileExtension}`;
+            const filename = createImageFilename(fileExtension, index);
 
-            await persistGeneratedImage({
+            const absolutePath = await persistGeneratedImage({
                 b64Json: imageData.b64_json,
                 filename,
                 ownerUserId,
-                storageMode: effectiveStorageMode
+                storageMode: effectiveStorageMode,
+                localOutputDir
             });
 
             return {
                 filename,
                 b64_json: imageData.b64_json,
-                path: `/api/image/${filename}`,
+                path: returnAbsolutePaths && absolutePath ? absolutePath : `/api/image/${filename}`,
                 output_format: fileExtension
             };
         })
@@ -211,9 +275,11 @@ export async function runStreamingImageGeneration(
         throw new Error('Server configuration error: API key not found.');
     }
 
-    const effectiveStorageMode = resolvePersistedStorageMode();
+    const effectiveStorageMode = resolvePersistedStorageMode(formData);
+    const localOutputDir = getLocalOutputDir(formData);
+    const returnAbsolutePaths = shouldReturnAbsolutePaths(formData);
     if (effectiveStorageMode === 'fs') {
-        await ensureOutputDirExists();
+        await ensureOutputDirExists(localOutputDir);
     }
 
     const mode = formData.get('mode') as 'generate' | 'edit' | null;
@@ -281,17 +347,18 @@ export async function runStreamingImageGeneration(
                     output_format: fileExtension
                 });
             } else if (event.type === 'image_generation.completed' && event.b64_json) {
-                const filename = `${timestamp}-${completedImages.length}.${fileExtension}`;
-                await persistGeneratedImage({
+                const filename = createImageFilename(fileExtension, completedImages.length, timestamp);
+                const absolutePath = await persistGeneratedImage({
                     b64Json: event.b64_json,
                     filename,
                     ownerUserId,
-                    storageMode: effectiveStorageMode
+                    storageMode: effectiveStorageMode,
+                    localOutputDir
                 });
                 completedImages.push({
                     filename,
                     b64_json: event.b64_json,
-                    path: `/api/image/${filename}`,
+                    path: returnAbsolutePaths && absolutePath ? absolutePath : `/api/image/${filename}`,
                     output_format: fileExtension
                 });
                 if ('usage' in event && event.usage) {
@@ -307,13 +374,7 @@ export async function runStreamingImageGeneration(
 
         const size = ((formData.get('size') as string) || 'auto') as OpenAI.Images.ImageEditParams['size'];
         const quality = (formData.get('quality') as OpenAI.Images.ImageEditParams['quality']) || 'auto';
-        const imageFiles: File[] = [];
-
-        for (const [key, value] of formData.entries()) {
-            if (key.startsWith('image_') && value instanceof File) {
-                imageFiles.push(value);
-            }
-        }
+        const imageFiles = await getEditImageFilesFromFormData(formData);
 
         if (imageFiles.length === 0) {
             throw new Error('No image file provided for editing.');
@@ -340,17 +401,18 @@ export async function runStreamingImageGeneration(
                     output_format: 'png'
                 });
             } else if (event.type === 'image_edit.completed' && event.b64_json) {
-                const filename = `${timestamp}-${completedImages.length}.png`;
-                await persistGeneratedImage({
+                const filename = createImageFilename('png', completedImages.length, timestamp);
+                const absolutePath = await persistGeneratedImage({
                     b64Json: event.b64_json,
                     filename,
                     ownerUserId,
-                    storageMode: effectiveStorageMode
+                    storageMode: effectiveStorageMode,
+                    localOutputDir
                 });
                 completedImages.push({
                     filename,
                     b64_json: event.b64_json,
-                    path: `/api/image/${filename}`,
+                    path: returnAbsolutePaths && absolutePath ? absolutePath : `/api/image/${filename}`,
                     output_format: 'png'
                 });
                 if ('usage' in event && event.usage) {

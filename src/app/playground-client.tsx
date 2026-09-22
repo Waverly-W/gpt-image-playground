@@ -6,7 +6,12 @@ import { PromptTemplateGallery } from '@/components/prompt-template-gallery';
 import { TaskQueuePanel, type QueueImageJob } from '@/components/task-queue-panel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { type SessionUser } from '@/lib/auth';
-import { createBatchJobFormData, type BatchGenerationRow } from '@/lib/batch-csv';
+import {
+    createBatchEditJobFormData,
+    createBatchJobFormData,
+    type BatchEditRow,
+    type BatchGenerationRow
+} from '@/lib/batch-csv';
 import type { CostDetails, GptImageModel } from '@/lib/cost-utils';
 import type { ImageQualityFailureReason } from '@/lib/image-quality-feedback';
 import type { PromptTemplate, PromptTemplateScene } from '@/lib/prompt-template-data';
@@ -49,12 +54,43 @@ const MAX_EDIT_IMAGES = 10;
 export default function ImagePlaygroundClient({
     initialUser,
     promptTemplates,
-    promptTemplateScenes
+    promptTemplateScenes,
+    initialModels,
+    defaultModelId
 }: {
     initialUser: SessionUser;
     promptTemplates: Array<PromptTemplate & { imageUrl: string }>;
     promptTemplateScenes: PromptTemplateScene[];
+    initialModels?: Array<{ value: string; label: string }>;
+    defaultModelId?: string;
 }) {
+    const [availableModels, setAvailableModels] = React.useState<Array<{ value: string; label: string }>>(
+        initialModels && initialModels.length > 0 ? initialModels : []
+    );
+
+    React.useEffect(() => {
+        const fetchModels = async () => {
+            try {
+                const res = await fetch('/api/models');
+                if (!res.ok) return;
+                const data = await res.json();
+                if (Array.isArray(data.models) && data.models.length > 0) {
+                    const mapped = data.models.map((m: { id: string; name: string }) => ({
+                        value: m.id,
+                        label: m.name || m.id
+                    }));
+                    setAvailableModels(mapped);
+                    if (data.defaultModel?.id) {
+                        setGenModel((prev) => (!prev || prev === 'gpt-image-2' ? data.defaultModel.id : prev));
+                        setEditModel((prev) => (!prev || prev === 'gpt-image-2' ? data.defaultModel.id : prev));
+                    }
+                }
+            } catch {
+                // Ignore model fetch error and fallback to default
+            }
+        };
+        void fetchModels();
+    }, []);
     const [mode, setMode] = React.useState<'generate' | 'edit'>('generate');
     const [activeSection, setActiveSection] = React.useState<ActiveSection>('generate');
     const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
@@ -90,7 +126,9 @@ export default function ImagePlaygroundClient({
     const [editDrawnPoints, setEditDrawnPoints] = React.useState<DrawnPoint[]>([]);
     const [editMaskPreviewUrl, setEditMaskPreviewUrl] = React.useState<string | null>(null);
 
-    const [genModel, setGenModel] = React.useState<GenerationFormData['model']>('gpt-image-2');
+    const [genModel, setGenModel] = React.useState<GenerationFormData['model']>(
+        (defaultModelId as GenerationFormData['model']) || 'gpt-image-2'
+    );
     const [genPrompt, setGenPrompt] = React.useState('');
     const [genN, setGenN] = React.useState([1]);
     const [genSize, setGenSize] = React.useState<GenerationFormData['size']>('auto');
@@ -105,7 +143,9 @@ export default function ImagePlaygroundClient({
         PromptTemplate['promptBuilderConfig'] | null
     >(null);
 
-    const [editModel, setEditModel] = React.useState<EditingFormData['model']>('gpt-image-2');
+    const [editModel, setEditModel] = React.useState<EditingFormData['model']>(
+        (defaultModelId as EditingFormData['model']) || 'gpt-image-2'
+    );
     const [enableStreaming, setEnableStreaming] = React.useState(false);
     const [partialImages, setPartialImages] = React.useState<1 | 2 | 3>(2);
 
@@ -145,9 +185,12 @@ export default function ImagePlaygroundClient({
         return () => window.removeEventListener('paste', handlePaste);
     }, [mode, editImageFiles.length]);
 
+    const [jobScope, setJobScope] = React.useState<'all' | 'mine'>('all');
+
     const loadJobs = React.useCallback(async () => {
         try {
-            const response = await fetch('/api/image-jobs');
+            const query = initialUser.role === 'admin' ? `?scope=${jobScope}` : '';
+            const response = await fetch(`/api/image-jobs${query}`);
             if (!response.ok) return;
 
             const result = (await response.json()) as { jobs?: QueueImageJob[] };
@@ -157,7 +200,7 @@ export default function ImagePlaygroundClient({
         } catch (jobLoadError) {
             console.error('Failed to load image jobs:', jobLoadError);
         }
-    }, []);
+    }, [initialUser.role, jobScope]);
 
     React.useEffect(() => {
         loadJobs();
@@ -291,6 +334,46 @@ export default function ImagePlaygroundClient({
         }
     };
 
+    const handleBatchEditApiCall = async (rows: BatchEditRow[]) => {
+        setIsCreatingJob(true);
+        setError(null);
+        setBatchProgress(`正在创建 ${rows.length} 个批量编辑任务`);
+
+        try {
+            const createdJobs = await Promise.all(
+                rows.map(async (row, index) => {
+                    const response = await fetch('/api/image-jobs', {
+                        method: 'POST',
+                        body: createBatchEditJobFormData(row)
+                    });
+                    const result = (await response.json()) as { job?: QueueImageJob; error?: string };
+
+                    if (!response.ok || !result.job) {
+                        throw new Error(
+                            result.error || `第 ${index + 1} 个编辑任务创建失败，状态码 ${response.status}`
+                        );
+                    }
+
+                    return result.job;
+                })
+            );
+
+            const newestFirst = [...createdJobs].reverse();
+            setJobs((prev) => [
+                ...newestFirst,
+                ...prev.filter((job) => !createdJobs.some((created) => created.id === job.id))
+            ]);
+            setBatchProgress(`已创建 ${createdJobs.length} 个批量编辑任务，队列将自动调度处理`);
+            void loadJobs();
+        } catch (batchError) {
+            console.error('Batch edit job creation error:', batchError);
+            setError(batchError instanceof Error ? batchError.message : '批量编辑任务创建失败。');
+        } finally {
+            setIsCreatingJob(false);
+            window.setTimeout(() => setBatchProgress(null), 3000);
+        }
+    };
+
     const handleCancelPendingJob = React.useCallback(
         async (jobId: string) => {
             try {
@@ -305,6 +388,31 @@ export default function ImagePlaygroundClient({
             } catch (cancelError) {
                 console.error('Failed to cancel pending image job:', cancelError);
                 setError(cancelError instanceof Error ? cancelError.message : '取消排队任务失败。');
+            }
+        },
+        [loadJobs]
+    );
+
+    const handleRetryFailedJob = React.useCallback(
+        async (jobId: string) => {
+            try {
+                const response = await fetch(`/api/image-jobs/${jobId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'retry' })
+                });
+                const result = (await response.json()) as { job?: QueueImageJob; error?: string };
+
+                if (!response.ok || !result.job) {
+                    throw new Error(result.error || `重试失败，状态码 ${response.status}`);
+                }
+
+                setJobs((prev) => prev.map((job) => (job.id === result.job!.id ? result.job! : job)));
+                setError(null);
+                void loadJobs();
+            } catch (retryError) {
+                console.error('Failed to retry image job:', retryError);
+                setError(retryError instanceof Error ? retryError.message : '重试失败任务失败。');
             }
         },
         [loadJobs]
@@ -545,12 +653,15 @@ export default function ImagePlaygroundClient({
                                         partialImages={partialImages}
                                         setPartialImages={setPartialImages}
                                         importedPromptBuilderConfig={genImportedPromptBuilderConfig}
+                                        modelOptions={availableModels}
                                     />
                                 </div>
                                 <div className={mode === 'edit' ? 'block h-full w-full' : 'hidden'}>
                                     <EditingForm
                                         onSubmit={handleApiCall}
+                                        onBatchSubmit={handleBatchEditApiCall}
                                         isLoading={isCreatingJob}
+                                        batchProgress={batchProgress}
                                         currentMode={mode}
                                         onModeChange={setMode}
                                         editModel={editModel}
@@ -590,17 +701,22 @@ export default function ImagePlaygroundClient({
                                         setEnableStreaming={setEnableStreaming}
                                         partialImages={partialImages}
                                         setPartialImages={setPartialImages}
+                                        modelOptions={availableModels}
                                     />
                                 </div>
                             </div>
 
                             <div data-panel='task-queue' className='min-h-[640px] lg:h-[calc(100dvh-7rem)]'>
-                            <TaskQueuePanel
-                                jobs={jobs}
-                                onClearQueue={handleClearQueue}
-                                onCancelPendingJob={handleCancelPendingJob}
-                                onUpdateQualityFeedback={handleUpdateQualityFeedback}
-                            />
+                                <TaskQueuePanel
+                                    jobs={jobs}
+                                    onClearQueue={handleClearQueue}
+                                    onCancelPendingJob={handleCancelPendingJob}
+                                    onRetryFailedJob={handleRetryFailedJob}
+                                    onUpdateQualityFeedback={handleUpdateQualityFeedback}
+                                    isAdmin={initialUser.role === 'admin'}
+                                    scope={jobScope}
+                                    onScopeChange={setJobScope}
+                                />
                             </div>
                         </section>
                     ) : (
